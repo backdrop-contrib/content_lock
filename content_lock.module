@@ -252,13 +252,24 @@ function content_lock_content_lock_skip_locking($node, $form_id, $form, $form_st
   return FALSE;
 }
 
+/**
+ * Calculate the token required to unlock a node.
+ *
+ * Tokens are required because they prevent CSRF,
+ * https://security.drupal.org/node/2429.
+ */
+function content_lock_get_release_token($nid) {
+  return drupal_get_token("content_lock/release/$nid");
+}
+
 function _content_lock_add_unload_js(&$form, $form_state) {
   $m = drupal_get_path('module','content_lock');
   drupal_add_js("$m/js/jquery.url.packed.js",'module');
   drupal_add_js("$m/js/onUserExit.js",'module');
   drupal_add_js("$m/js/content_lock_init.js",'module');
   $lock = content_lock_fetch_lock($form['#node']->nid);
-  drupal_add_js(array('content_lock' => array('nid' => $form['#node']->nid, 'ajax_key' => $lock->ajax_key, 'unload_js_message' => variable_get('content_lock_unload_js_message', 'If you proceed, ALL of your changes will be lost.'))), 'setting');
+  $token = content_lock_get_release_token($form['#node']->nid);
+  drupal_add_js(array('content_lock' => array('nid' => $form['#node']->nid, 'token' => $token, 'ajax_key' => $lock->ajax_key, 'unload_js_message' => variable_get('content_lock_unload_js_message', 'If you proceed, ALL of your changes will be lost.'))), 'setting');
   return $form;
 }
 
@@ -353,7 +364,8 @@ function content_lock_node($nid, $uid, $quiet = FALSE) {
     }
 
     if (isset($url)) {
-      $message .= '<br />'. t('Click !here to check back in now.', array('!here' => l(t('here'), $url, array('query' => array('destination' => $_GET['q'])))));
+      $token = content_lock_get_release_token($nid);
+      $message .= '<br />'. t('Click !here to check back in now.', array('!here' => l(t('here'), $url, array('query' => array('token' => $token, 'destination' => $_GET['q'])))));
     }
     if(!empty($message)) {
       drupal_set_message($message, 'warning', FALSE);
@@ -456,7 +468,7 @@ function content_lock_overview($account = NULL) {
     }
     $row[] = format_date($data->timestamp, 'small');
     if($uid == $user->uid || user_access('administer checked out documents')) {
-      $row[] = l(t('release lock'), $url);
+      $row[] = l(t('release lock'), $url, array('query' => array('token' => content_lock_get_release_token($data->nid))));
     }
     $rows[] = $row;
   }
@@ -483,6 +495,9 @@ function content_lock_overview($account = NULL) {
  *   This function will execute a redirect and doesn't return.
  */
 function content_lock_release_item($nid, $account = NULL) {
+  if (empty($_GET['token']) || !drupal_valid_token($_GET['token'], "content_lock/release/$nid")) {
+    return MENU_ACCESS_DENIED;
+  }
   content_lock_release($nid, $account ? $account->uid : NULL);
   if(_content_lock_verbose()) {
     drupal_set_message(t('The editing lock has been released.'),'status', FALSE);
@@ -517,7 +532,8 @@ function content_lock_warn_pending_locks($uid) {
 
   foreach($warned_nodes[$uid] as $lock) {
     $nodetitle_link = l($lock->title,"node/{$lock->nid}");
-    $releasethelock_link = l(t('release the lock'),"admin/content/{$lock->nid}/content_lock/releaseown");
+    $token = content_lock_get_release_token($lock->nid);
+    $releasethelock_link = l(t('release the lock'),"admin/content/{$lock->nid}/content_lock/releaseown", array('query' => array('token' => $token)));
     _content_lock_save_lock_warning(t("The node '!nodetitle_link' is locked by you. You may want to '!releasethelock_link' in order to allow others to edit.", array ('!nodetitle_link' => $nodetitle_link, '!releasethelock_link' => $releasethelock_link)),$lock->nid);
   }
   $content_lock_messages_printed = true;
@@ -579,7 +595,9 @@ function _content_lock_still_locked($uid,$nid) {
  */
 function content_lock_release_own_item($nid, $response = true) {
   global $user;
-
+  if (!isset($_GET['token']) || !drupal_valid_token($_GET['token'], "content_lock/release/$nid")) {
+    return MENU_ACCESS_DENIED;
+  }
   if($nid != NULL) {
     if (!$response) {
       $lock = content_lock_fetch_lock($nid);
