@@ -10,7 +10,7 @@ Drupal.behaviors.content_lock = {
     var ajax_key = Drupal.settings.content_lock.ajax_key;
     jQuery.ajax({
       url: Drupal.settings.basePath + 'ajax/content_lock/'+nid+'/canceledit',
-      data: {k: ajax_key},
+      data: {k: ajax_key, token: Drupal.settings.content_lock.token},
       async: false,
       cache: false
     });
