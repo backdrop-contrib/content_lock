@@ -20,10 +20,15 @@ Drupal.behaviors.content_lock = {
     return Drupal.t(Drupal.settings.content_lock.unload_js_message);
   }
 
+  /* Prevent submitting the node form from being interpreted as "leaving the page" */
+  jQuery('form.node-form').submit(function () {
+    userMovingWithinSite();
+  });
+
     jQuery().onUserExit( {
       execute: content_lock_onleave,
       executeConfirm: content_lock_confirm,
-      internalURLs: 'canceledit|trash/confirm|edit'
+      internalURLs: 'node/' + Drupal.settings.content_lock.nid + '/edit'
     });
   }
 };
