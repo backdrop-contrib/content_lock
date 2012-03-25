@@ -191,13 +191,23 @@ function content_lock_form_alter(&$form, &$form_state, $form_id) {
   global $user;
   $node = empty($form['#node']) ? NULL : $form['#node'];
   $nid = empty($form['nid']['#value']) ? NULL : $form['nid']['#value'];
+  $destination = 'node/' . $nid;
+
+  /* Ensure that users acquire a lock when reverting a node to an older revision. */
+  if (!empty($form['#node_revision'])) {
+    $node = $form['#node_revision'];
+    $nid = $node->nid;
+    $destination = 'node/' . $nid . '/revisions';
+  }
 
   /* **************** Restore the node format ****************************** */
   // _content_lock_is_lockable_node() needs to know the original
   // node format. We either dig up a stashed content_lock_old_format or
   // initialize it here.
   // Only touch node edit forms and then only if the form is `normal' and has a body with a format (#1183678):
-  if (is_object($node) && is_numeric($nid) && $node->type . '_node_form' == $form_id && !empty($node->body[$node->language][0]['format'])) {
+  if (is_object($node) && is_numeric($nid)
+      && ($form_id == $node->type . '_node_form' || $form_id == 'node_revision_revert_confirm')
+      && !empty($node->body[$node->language][0]['format'])) {
     $old_format = $node->body[$node->language][0]['format'];
       if (!empty($node->content_lock_old_format)) {
         $old_format = $node->content_lock_old_format;
@@ -248,8 +258,8 @@ function content_lock_form_alter(&$form, &$form_state, $form_id) {
       else if ($form_state['submitted'] === FALSE) {
         // Finally set the lock if everthing passed.
         if(content_lock_node($nid, $user->uid) == false) {
-          // could not lock node, its locked by someone else
-          drupal_goto("node/$nid");
+          // could not lock node, it's locked by someone else
+          drupal_goto($destination);
         }
       }
       // else if($form_state['submitted'] === TRUE)
@@ -264,6 +274,12 @@ function content_lock_form_alter(&$form, &$form_state, $form_id) {
 function content_lock_content_lock_skip_locking($node, $form_id, $form, $form_state) {
   global $user;
   $nid = empty($form['nid']['#value']) ? NULL : $form['nid']['#value'];
+
+  /* support the node revision form by not requiring the form to have an 'nid' key */
+  if (empty($nid) && $form_id == 'node_revision_revert_confirm' && !empty($form['#node_revision'])) {
+    $nid = $node->nid;
+  }
+
   // Locked node types. Dont mix this up with the content_types you can chose on the admin form of content lock
   // this types are forced due to disfunctionality
   $node_type_blacklist = array(
@@ -286,8 +302,8 @@ function content_lock_content_lock_skip_locking($node, $form_id, $form, $form_st
       || !empty($form_id_blacklist[$form_id])     // If this form is blacklisted, don't lock.
       || $user->uid <= 0                          // A valid user is needed for locking
       || !user_access('check out documents')      // The user must have this permission to be able to lock.
-      || $form_id != $node->type . '_node_form'   // See node_forms(). Don't lock custom forms just because
-                                                  //   they have $form['nid'] and $form['#node'].
+      || ($form_id != $node->type . '_node_form'  // See node_forms(). Don't lock custom forms just because
+          && $form_id != 'node_revision_revert_confirm') // they have $form['nid'] and $form['#node'].
   ) {
     // Preconditions failed, skip the lock
     return TRUE;
@@ -319,9 +335,28 @@ function _content_lock_add_unload_js(&$form, $form_state) {
   drupal_add_js("$m/js/jquery.url.packed.js", array('group' => JS_LIBRARY));
   drupal_add_js("$m/js/onUserExit.js", array('group' => JS_LIBRARY));
   drupal_add_js("$m/js/content_lock_init.js");
-  $lock = content_lock_fetch_lock($form['#node']->nid);
-  $token = content_lock_get_release_token($form['#node']->nid);
-  drupal_add_js(array('content_lock' => array('nid' => $form['#node']->nid, 'token' => $token, 'ajax_key' => $lock->ajax_key, 'unload_js_message' => variable_get('content_lock_unload_js_message', 'If you proceed, ALL of your changes will be lost.'))), 'setting');
+
+  $nid = empty($form['nid']['#value']) ? NULL : $form['nid']['#value'];
+  $internal_urls = array();
+  $internal_form_selectors = array();
+
+  /* We're on a locked revision reversion page... */
+  if (!empty($form['#node_revision']->nid)) {
+    $nid = $form['#node_revision']->nid;
+    /* Don't ask the user if he wants to leave the page when cancelling a reversion */
+    $internal_urls[] = $form['actions']['cancel']['#href'];
+    $internal_form_selectors[] = '.confirmation';
+  }
+
+  $internal_urls[] = 'node/' . $nid . '/edit';
+  $internal_form_selectors[] = 'form.node-form';
+  $lock = content_lock_fetch_lock($nid);
+  $token = content_lock_get_release_token($nid);
+  drupal_add_js(array('content_lock' => array('nid' => $nid,
+        'ajax_key' => $lock->ajax_key, 'token' => $token,
+        'unload_js_message' => variable_get('content_lock_unload_js_message', 'If you proceed, ALL of your changes will be lost.'),
+        'internal_urls' => implode('|', $internal_urls),
+        'internal_forms' => implode(', ', $internal_form_selectors))), 'setting');
   return $form;
 }
 
@@ -331,9 +366,29 @@ function _content_lock_verbose() {
 
 function _content_lock_add_cancelbutton(&$form, $form_state, $form_id) {
   // If we're on the node form
-  if (!empty($form['#node']) && ($node = $form['#node']) && $form_id == $node->type . '_node_form') {
+  $node = empty($form['#node']) ? NULL : $form['#node'];
+  $nid = empty($form['nid']['#value']) ? NULL : $form['nid']['#value'];
+  if (!empty($form['#node_revision'])) {
+    $node = $form['#node_revision'];
+    $nid = $node->nid;
+  }
+
+  if (!empty($node) && !empty($nid)
+      && ($form_id == $node->type . '_node_form' || $form_id == 'node_revision_revert_confirm')) {
+    // revert node
+    if ($form_id == 'node_revision_revert_confirm') {
+      /* hijack the default cancel link to become a lock-releasing link */
+      $destination = 'node/' . $nid . '/revisions';
+      if (!empty($form['actions']['cancel']['#href'])) {
+        $destination = $form['actions']['cancel']['#href'];
+      }
+      $form['actions']['cancel']['#href'] = 'admin/content/' . $nid . '/content_lock/releaseown';
+      $form['actions']['cancel'] += array('#options' => array());
+      $form['actions']['cancel']['#options'] += array('query' => array('token' => content_lock_get_release_token($nid),
+          'destination' => $destination));
+    }
     // If we're editing a node (not adding)
-    if ($node->nid) {
+    else if ($node->nid) {
       $form['actions']['cancel'] = array(
         '#type' => 'button',
         '#weight' => 2000,
