@@ -20,7 +20,7 @@ Drupal.behaviors.content_lock = function() {
   }
 
   /* Prevent submitting the node form from being interpreted as "leaving the page" */
-  $('form#node-form').submit(function () {
+  $(Drupal.settings.content_lock.internal_forms).submit(function () {
     userMovingWithinSite();
   });
 
@@ -28,7 +28,7 @@ Drupal.behaviors.content_lock = function() {
     $().onUserExit( {
       execute: content_lock_onleave,
       executeConfirm: content_lock_confirm,
-      internalURLs: 'node/' + Drupal.settings.content_lock.nid + '/edit'
+      internalURLs: Drupal.settings.content_lock.internal_urls
     });
   });
 };
