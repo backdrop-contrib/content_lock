@@ -51,7 +51,7 @@ function content_lock_menu() {
   );
   $items['admin/content/%/content_lock/releaseown'] = array(
     'page callback' => 'content_lock_release_own_item',
-    'page arguments' => array(2),
+    'page arguments' => array(2, TRUE, FALSE),
     'access arguments' => array('check out documents'),
     'type' => MENU_CALLBACK,
   );
@@ -66,7 +66,7 @@ function content_lock_menu() {
   );
   $items['ajax/content_lock/%/canceledit'] = array (
     'page callback' => 'content_lock_release_own_item',
-    'page arguments' => array(2,false),
+    'page arguments' => array(2, FALSE, FALSE),
     'access callback' => true
   );
   $items['admin/settings/content_lock'] = array (
@@ -351,7 +351,7 @@ function _content_lock_add_cancelbutton(&$form, $form_state, $form_id) {
  */
 function content_lock_cancel_submit(&$form, &$form_state) {
   // Release the node
-  content_lock_release_own_item($form['#node']->nid);
+  content_lock_release_own_item($form['#node']->nid, TRUE, TRUE);
 }
 
 /**
@@ -642,13 +642,25 @@ function _content_lock_still_locked($uid,$nid) {
  *   changing the ajax_key when responding to the browser, we can
  *   detect that the soon-to-come ajax request is from the previous
  *   page load and that it should be ignored.
+ * @param $ignore_token
+ *   Use this to disable the anti-CSRF token check. This should only
+ *   be disabled when some other means is being used to prevent
+ *   CSRF. Drupal forms, for example, are already protected by the
+ *   equivalent of a token—we need not and may not go adding tokens to
+ *   the node forms we hijack.
  */
-function content_lock_release_own_item($nid, $response = true) {
+function content_lock_release_own_item($nid, $response = TRUE, $ignore_token = FALSE) {
   global $user;
-  if (!isset($_GET['token']) || !drupal_valid_token($_GET['token'], "content_lock/release/$nid")) {
-    return MENU_ACCESS_DENIED;
+  if (!$ignore_token) {
+    if (!isset($_GET['token']) || !drupal_valid_token($_GET['token'], "content_lock/release/$nid")) {
+      return MENU_ACCESS_DENIED;
+    }
   }
   if($nid != NULL) {
+    /*
+     * Imply that this is an AJAX request if we aren't expected to
+     * interface with a human.
+     */
     if (!$response) {
       $lock = content_lock_fetch_lock($nid);
       if (strcmp($_GET['k'], $lock->ajax_key)) {
