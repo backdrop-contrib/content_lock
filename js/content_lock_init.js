@@ -1,3 +1,4 @@
+/* -*- indent-tabs-mode: nil; js-indent-level: 2; -*- */
 /**
  * @file
  *   Initialize onUnload scripts.
@@ -17,7 +18,8 @@ Drupal.behaviors.content_lock = {
   }
 
   window.content_lock_confirm = function () {
-    return Drupal.t(Drupal.settings.content_lock.unload_js_message);
+    if (Drupal.settings.content_lock.unload_js_message_enable)
+      return Drupal.t(Drupal.settings.content_lock.unload_js_message);
   }
 
   /* Prevent submitting the node form from being interpreted as "leaving the page" */

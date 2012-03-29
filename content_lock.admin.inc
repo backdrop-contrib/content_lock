@@ -7,13 +7,25 @@
  * Providing an administration interface for content_lock.
  */
 function content_lock_admin_settings() {
+  drupal_add_js(drupal_get_path('module','content_lock') . '/content_lock.admin.js');
+
   $form['content_lock_unload_js'] = array(
       '#type' => 'checkbox',
       '#title' => t('Use javascript to detect leaving the node form'),
-      '#description' => t('If you disable this, there will be no messages like “Do you really want to leave this node and lose all changes? The lock will be removed if you proceed.”. Also, disabling this will cause nodes to remain locked if the user avoids saving the node and does not use the cancel button (i.e., by clicking a menu link to navigate away from a node-edit page).'),
+      '#description' => t('If you disable this, nodes will remain locked if the user navigates away from the node without saving it or clicking the cancel button.'),
       '#default_value' => variable_get('content_lock_unload_js', true),
   );
-  $form['content_lock_unload_js_message'] = array(
+  $form['content_lock_unload_js_fieldset'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Javascript detection options.'),
+  );
+  $form['content_lock_unload_js_fieldset']['content_lock_unload_js_message_enable'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Confirm that the user really wants to leave the node form with a Javascript popup'),
+    '#description' => t('This will cause a Javascript popup to ask the user if navigating away from the node edit page is intentional, giving the user an opportunity to cancel navigation so that the changes to the node may be saved. This will not appear if the user clicks the cancel button.'),
+    '#default_value' => variable_get('content_lock_unload_js_message_enable', TRUE),
+  );
+  $form['content_lock_unload_js_fieldset']['content_lock_unload_js_message'] = array(
       '#type' => 'textfield',
       '#title' => t('Javascript popup message text'),
       '#description' => t('This option allows you to modify the text the user sees when navigating away from an edited node.'),
