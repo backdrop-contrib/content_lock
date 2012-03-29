@@ -1,6 +1,6 @@
 /** -*- indent-tabs-mode: nil; js-indent-level: 2; -*-
  * @file
- *   Initialize onUnload scripts.
+ *   Javascriptize the administration page.
  */
 
 Drupal.behaviors.content_lock_admin = function() {
