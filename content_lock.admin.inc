@@ -7,7 +7,13 @@
  * Providing an administration interface for content_lock.
  */
 function content_lock_admin_settings() {
-  drupal_add_js(drupal_get_path('module','content_lock') . '/content_lock.admin.js');
+  $form = array();
+
+  $form['#attached'] = array(
+    'js' => array(
+      drupal_get_path('module','content_lock') . '/content_lock.admin.js',
+    ),
+  );
 
   $form['content_lock_unload_js'] = array(
       '#type' => 'checkbox',
