@@ -1,4 +1,5 @@
-/** -*- indent-tabs-mode: nil; js-indent-level: 2; -*-
+/* -*- indent-tabs-mode: nil; js-indent-level: 2; -*- */
+/**
  * @file
  *   Javascriptize the administration page.
  */

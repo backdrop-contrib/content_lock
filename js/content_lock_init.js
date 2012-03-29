@@ -1,3 +1,4 @@
+/* -*- indent-tabs-mode: nil; js-indent-level: 2; -*- */
 /**
  * @file
  *   Initialize onUnload scripts.
