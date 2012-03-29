@@ -632,7 +632,7 @@ function content_lock_release_item($nid, $account = NULL) {
   if(_content_lock_verbose()) {
     if (!empty($lock) && !$account && $user->uid != $lock->uid) {
       $lock_account = user_load($lock->uid);
-      drupal_set_message(t('The editing lock held by !user has been released.', array('!user' => theme('username', $lock_account))), 'status', FALSE);
+      drupal_set_message(t('The editing lock held by !user has been released.', array('!user' => theme('username', array('account' => $lock_account)))), 'status', FALSE);
     } else {
       drupal_set_message(t('The editing lock has been released.'),'status', FALSE);
     }
