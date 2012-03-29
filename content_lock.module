@@ -299,11 +299,17 @@ function _content_lock_add_unload_js(&$form, $form_state) {
   $internal_form_selectors[] = 'form#node-form';
   $lock = content_lock_fetch_lock($nid);
   $token = content_lock_get_release_token($nid);
-  drupal_add_js(array('content_lock' => array('nid' => $nid,
-        'ajax_key' => $lock->ajax_key, 'token' => $token,
-        'unload_js_message' => variable_get('content_lock_unload_js_message', 'If you proceed, ALL of your changes will be lost.'),
-        'internal_urls' => implode('|', $internal_urls),
-        'internal_forms' => implode(', ', $internal_form_selectors))), 'setting');
+  $settings = array(
+    'nid' => $nid,
+    'ajax_key' => $lock->ajax_key, 'token' => $token,
+    'unload_js_message_enable' => variable_get('content_lock_unload_js_message_enable', TRUE),
+    'internal_urls' => implode('|', $internal_urls),
+    'internal_forms' => implode(', ', $internal_form_selectors),
+  );
+  if ($settings['unload_js_message_enable']) {
+    $settings['unload_js_message'] = variable_get('content_lock_unload_js_message', 'If you proceed, ALL of your changes will be lost.');
+  }
+  drupal_add_js(array('content_lock' => $settings), 'setting');
   return $form;
 }
 
