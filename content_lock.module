@@ -370,7 +370,7 @@ function _content_lock_add_unload_js(&$form, $form_state) {
    * value. Not calling drupal_add_js() multiple times deprives
    * file_ajax_upload() of the ability to mess up here ;-).
    */
-  static $called;
+  $called =& drupal_static(__FUNCTION__ . '__called');
   if (!empty($called)) {
     $called++;
     return $form;
