@@ -688,7 +688,7 @@ function content_lock_release($nid, $uid = NULL) {
   if (!empty($uid))
     $query->condition('uid', $uid);
   $query->execute();
-  module_invoke_all('content_lock_released', $nid);
+  module_invoke_all('content_lock_release', $nid);
 }
 
 function _content_lock_release_all_user_locks($uid) {
