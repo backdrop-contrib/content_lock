@@ -700,15 +700,17 @@ function _content_lock_release_all_user_locks($uid) {
 /**
  * Build an overview of locked documents.
  *
- * @param $account
- *   A user object.
+ * @param object $account
+ *
+ * @return string
+ * @throws \Exception
  */
 function content_lock_overview($account = NULL) {
   global $user;
   // TODO: old checkout code, review
   $header = array(array('data' => t('Title'), 'field' => 'n.title', 'sort' => 'asc'));
-  // in the case of an admin, we dont have uid, as he sees all locks
-  if (!$account) {
+  // In the case of an admin, we dont have uid, as he sees all locks.
+  if (!is_object($account)) {
     $header[] = array('data' => t('Username'), 'field' => 'u.name');
     $uid = NULL;
   }
