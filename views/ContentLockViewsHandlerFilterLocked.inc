@@ -1,12 +1,18 @@
-<?php /* -*- mode: php; indent-tabs-mode: nil; tab-width: 2; -*- */
+<?php
 
 /**
  * @file
- * Handler to filter based on locked nodes
+ * Handler to filter based on locked nodes.
  */
 
-class views_handler_filter_is_locked extends views_handler_filter_boolean_operator {
-  function query() {
+/**
+ * Class ContentLockViewsHandlerFilterLocked.
+ */
+class ContentLockViewsHandlerFilterLocked extends views_handler_filter_boolean_operator {
+  /**
+   * Query.
+   */
+  public function query() {
     $this->ensure_my_table();
     if (empty($this->value)) {
       $this->query->add_where($this->options['group'], "$this->table_alias.timestamp IS NULL");
@@ -15,4 +21,5 @@ class views_handler_filter_is_locked extends views_handler_filter_boolean_operat
       $this->query->add_where($this->options['group'], "$this->table_alias.timestamp IS NOT NULL");
     }
   }
+
 }
