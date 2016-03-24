@@ -274,6 +274,8 @@ function content_lock_form_alter(&$form, &$form_state, $form_id) {
   // and has a body with a format (#1183678).
   if (is_object($node) && is_numeric($nid)
     && ($form_id == $node->type . '_node_form' || $form_id == 'node_revision_revert_confirm')
+    && isset($node->body)
+    && is_array($node->body)
     && !empty($node->body[$node->language][0]['format'])
   ) {
     $old_format = $node->body[$node->language][0]['format'];
@@ -1062,7 +1064,7 @@ function content_lock_content_lock_node_lockable($node) {
   // we store the original input format. Remember that not all nodes
   // store formats in the same way nor even have formats (#1183678).
   $format = '';
-  if (!empty($node->body[$node->language][0]['format'])) {
+  if (isset($node->body) && is_array($node->body) && !empty($node->body[$node->language][0]['format'])) {
     $format = $node->body[$node->language][0]['format'];
   }
   if (!empty($node->content_lock_old_format)) {
