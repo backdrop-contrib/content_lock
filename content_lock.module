@@ -1022,7 +1022,7 @@ function content_lock_release_own_item($nid, $response = TRUE, $ignore_token = F
       $lock = content_lock_fetch_lock($nid);
       if (empty($lock) || strcmp($_GET['k'], $lock->ajax_key)) {
         // We have no lock or the key doesn't match. Don't unlock the node.
-        exit();
+        drupal_exit();;
       }
     }
     content_lock_release($nid, $user->uid);
@@ -1031,7 +1031,7 @@ function content_lock_release_own_item($nid, $response = TRUE, $ignore_token = F
       drupal_goto("node/$nid");
     }
     else {
-      exit();
+      drupal_exit();;
     }
   }
   else {
@@ -1040,7 +1040,7 @@ function content_lock_release_own_item($nid, $response = TRUE, $ignore_token = F
       drupal_goto();
     }
     else {
-      exit();
+      drupal_exit();;
     }
   }
 }
