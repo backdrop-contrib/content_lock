@@ -462,11 +462,23 @@ function _content_lock_add_unload_js(&$form, $form_state) {
 
   $internal_urls[] = 'node/' . $nid . '/edit';
   $internal_form_selectors[] = 'form.node-form';
+
+  // Check lock status.
   $lock = content_lock_fetch_lock($nid);
+  if ($lock) {
+    $lock_ajax_key = $lock->ajax_key;
+  }
+  else {
+    $lock_ajax_key = FALSE;
+  }
+
+  // Get tokens.
   $token = content_lock_get_release_token($nid);
+
+  // Prepare settings.
   $settings = array(
     'nid' => $nid,
-    'ajax_key' => $lock->ajax_key,
+    'ajax_key' => $lock_ajax_key,
     'token' => $token,
     'unload_js_message_enable' => variable_get('content_lock_unload_js_message_enable', TRUE),
     'internal_urls' => implode('|', $internal_urls),
@@ -1009,11 +1021,8 @@ function content_lock_release_own_item($nid, $response = TRUE, $ignore_token = F
      */
     if (!$response) {
       $lock = content_lock_fetch_lock($nid);
-      if (strcmp($_GET['k'], $lock->ajax_key)) {
-        /* the key doesn't match, don't unlock the node */
-        if ($response) {
-          drupal_set_message(t('Trounced AJAX unlock request.'), 'status', FALSE);
-        }
+      if (empty($lock) || strcmp($_GET['k'], $lock->ajax_key)) {
+        // We have no lock or the key doesn't match. Don't unlock the node.
         exit();
       }
     }
