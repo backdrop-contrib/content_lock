@@ -1097,3 +1097,12 @@ function content_lock_views_api() {
     'path' => drupal_get_path('module', 'content_lock') . '/views',
   );
 }
+
+/**
+ * Implements hook_ctools_plugin_directory().
+ */
+function content_lock_ctools_plugin_directory($owner, $plugin_type) {
+  if ($owner == 'ctools' && $plugin_type == 'access') {
+    return "plugins/$plugin_type";
+  }
+}
