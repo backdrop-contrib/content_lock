@@ -6,4 +6,4 @@ dependencies[] = node
 files[] = views/ContentLockViewsHandlerFieldLocked.inc
 files[] = views/ContentLockViewsHandlerFilterLocked.inc
 files[] = views/ContentLockViewsHandlerSortLocked.inc
-configure = admin/settings/content_lock
+configure = admin/config/content/content_lock
