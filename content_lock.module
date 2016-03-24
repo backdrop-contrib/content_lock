@@ -951,7 +951,7 @@ function _content_lock_show_warnings() {
     return;
   }
   foreach ($data as $nid => $messsage) {
-    if (_content_lock_still_locked($user->uid, $nid) > 0) {
+    if (_content_lock_still_locked($user->uid, $nid)) {
       drupal_set_message($messsage, 'warning', FALSE);
     }
   }
@@ -976,7 +976,7 @@ function _content_lock_still_locked($uid, $nid) {
     ->countQuery();
   $result = $query->execute();
 
-  return (bool) $result->fetchCol();
+  return (bool) $result->fetchField();
 }
 
 /**
