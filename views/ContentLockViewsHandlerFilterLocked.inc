@@ -15,10 +15,10 @@ class ContentLockViewsHandlerFilterLocked extends views_handler_filter_boolean_o
   public function query() {
     $this->ensure_my_table();
     if (empty($this->value)) {
-      $this->query->add_where($this->options['group'], "$this->table_alias.timestamp IS NULL");
+      $this->query->add_where($this->options['group'], $this->table_alias . ".timestamp", "NULL", "=");
     }
     else {
-      $this->query->add_where($this->options['group'], "$this->table_alias.timestamp IS NOT NULL");
+      $this->query->add_where($this->options['group'], $this->table_alias . ".timestamp", "NULL", "<>");
     }
   }
 
