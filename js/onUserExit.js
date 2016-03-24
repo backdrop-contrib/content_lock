@@ -5,6 +5,7 @@
 
 // This is the var that determines if the unload was caused by a user leaving, or navigating in the site.
 var movingWithinSite = false;
+var keyCode;
 var codeToExecute = function () {
   'use strict';
 };
