@@ -134,6 +134,20 @@ function content_lock_menu() {
 }
 
 /**
+ * Implements hook_drupal_goto_alter().
+ */
+function content_lock_drupal_goto_alter(&$path, &$options, &$http_response_code) {
+  // Add content lock token.
+  if (module_exists('entity_translation') && fnmatch('node/*/edit/add/*/*', $path) && !isset($options['content_lock_token'])) {
+    $options = array(
+      'query' => array(
+        'content_lock_token' => drupal_get_token($path),
+      ),
+    );
+  }
+}
+
+/**
  * Implements hook_admin_paths().
  *
  * Register ajax lock paths as an admin path.
@@ -193,6 +207,7 @@ function content_lock_content_lock_path_protected($path) {
   if (strpos($path, 'node/') === 0) {
     $paths_patterns = array(
       'node/*/edit',
+      'node/*/edit/*',
       'node/*/revisions/*/revert',
     );
     foreach ($paths_patterns as $protected_pattern) {
