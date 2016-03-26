@@ -1,4 +1,4 @@
-name = Content locking (edit lock) timeouts
+name = Content Lock Timeouts
 description = Provides mechanisms for automatically unlocking nodes that have been locked for a certain length of time.
 core = 7.x
 dependencies[] = content_lock

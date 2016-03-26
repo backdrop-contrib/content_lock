@@ -191,7 +191,7 @@ function hook_content_lock_release($nid, $uid = NULL) {
 /**
  * Determine whether or not a node is lockable.
  *
- * Called from _content_lock_is_lockable_node() which is in turn
+ * Called from content_lock_is_lockable() which is in turn
  * called from any code which is conditional upon a node being
  * lockable or not. If this hook returns an affirmative and allows a
  * node to be locked at one point but later on returns a negative on

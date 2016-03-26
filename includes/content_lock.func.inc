@@ -29,10 +29,10 @@ function _content_lock_form_handler(&$form, &$form_state, $form_id, $callback = 
  *   Form array
  */
 function _content_lock_add_unload_js(&$form, $form_state) {
-  $m = drupal_get_path('module', 'content_lock');
-  drupal_add_js("$m/js/content_lock.url.js", array('group' => JS_LIBRARY));
-  drupal_add_js("$m/js/content_lock.core.js", array('group' => JS_LIBRARY));
-  drupal_add_js("$m/js/content_lock.init.js");
+  $path = drupal_get_path('module', 'content_lock');
+  drupal_add_js($path . '/js/content_lock.url.js', array('group' => JS_LIBRARY));
+  drupal_add_js($path . '/js/content_lock.core.js', array('group' => JS_LIBRARY));
+  drupal_add_js($path . '/js/content_lock.init.js', array('group' => JS_DEFAULT));
 
   $nid = empty($form['nid']['#value']) ? NULL : $form['nid']['#value'];
   $internal_urls = array();
@@ -93,4 +93,128 @@ function _content_lock_add_unload_js(&$form, $form_state) {
   drupal_add_js(array('content_lock' => $settings), 'setting');
 
   return $form;
+}
+
+/**
+ * Check lock status.
+ *
+ * @param int $uid
+ *    User ID.
+ * @param int $nid
+ *    Node ID.
+ *
+ * @return bool
+ *    Return TRUE OR FALSE.
+ */
+function _content_lock_still_locked($uid, $nid) {
+  $query = db_select('content_lock', 'c')
+    ->condition('nid', $nid)
+    ->condition('uid', $uid)
+    ->countQuery();
+  $result = $query->execute();
+
+  return (bool) $result->fetchField();
+}
+
+/**
+ * Release all locks.
+ */
+function _content_lock_release_all_user_locks($uid) {
+  db_delete('content_lock')
+    ->condition('uid', $uid)
+    ->execute();
+}
+
+/**
+ * Save lock warning.
+ *
+ * @param string $message
+ *    Message string.
+ * @param int $nid
+ *    Node id.
+ */
+function _content_lock_save_lock_warning($message, $nid) {
+  if (empty($_SESSION['content_lock'])) {
+    $_SESSION['content_lock'] = '';
+  }
+  $data = unserialize($_SESSION['content_lock']);
+  if (!is_array($data)) {
+    $data = array();
+  }
+
+  if (array_key_exists($nid, $data)) {
+    return;
+  }
+
+  $data[$nid] = $message;
+  $_SESSION['content_lock'] = serialize($data);
+}
+
+/**
+ * Show warnings.
+ */
+function _content_lock_show_warnings() {
+  global $user;
+  if (empty($_SESSION['content_lock'])) {
+    return;
+  }
+  $data = unserialize($_SESSION['content_lock']);
+  if (!is_array($data) || count($data) == 0) {
+    return;
+  }
+  foreach ($data as $nid => $messsage) {
+    if (_content_lock_still_locked($user->uid, $nid)) {
+      drupal_set_message($messsage, 'warning', FALSE);
+    }
+  }
+  $_SESSION['content_lock'] = '';
+}
+
+/**
+ * Warn pending locks.
+ *
+ * For every lock a user current have on any nodes, print a warning message
+ * with an link to release this node.
+ *
+ * @param int $uid
+ *    User ID.
+ */
+function _content_lock_warn_pending_locks($uid) {
+  // Cache.
+  static $warned_nodes = array();
+  static $content_lock_messages_printed = FALSE;
+  if ($content_lock_messages_printed) {
+    return;
+  }
+
+  if (array_key_exists($uid, $warned_nodes)) {
+    // Placeholder.
+  }
+  else {
+    // Load form db.
+    $warned_nodes[$uid] = array();
+    $query = db_select('content_lock', 'c')
+      ->fields('c', array('nid'))
+      ->condition('c.uid', $uid);
+    $n = $query->leftJoin('node', 'n', '%alias.nid = c.nid');
+    $query->fields($n, array('title'));
+
+    foreach ($query->execute() as $lock) {
+      $warned_nodes[$uid][] = $lock;
+    }
+  }
+
+  // Load module inc file.
+  module_load_include('inc', 'content_lock', 'includes/content_lock.func');
+
+  foreach ($warned_nodes[$uid] as $lock) {
+    $nodetitle_link = l($lock->title, "node/{$lock->nid}");
+    $token = content_lock_get_release_token($lock->nid);
+    $releasethelock_link = l(t('release the lock'), "admin/content/{$lock->nid}/content_lock/releaseown", array('query' => array('token' => $token)));
+    _content_lock_save_lock_warning(t("The node '!nodetitle_link' is locked by you. You may want to '!releasethelock_link' in order to allow others to edit.", array(
+      '!nodetitle_link' => $nodetitle_link,
+      '!releasethelock_link' => $releasethelock_link,
+    )), $lock->nid);
+  }
+  $content_lock_messages_printed = TRUE;
 }

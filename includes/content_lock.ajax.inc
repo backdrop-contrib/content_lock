@@ -21,7 +21,7 @@ function content_lock_node_ajax_callback($node, $token) {
 
   // Only lock the node if we have a valid CSRF token.
   if (drupal_valid_token($token, $node->nid)) {
-    content_lock_node($node->nid, $user->uid);
+    content_lock_locking($node->nid, $user->uid);
 
     // Add the javascript that unlocks the node when the user navigates away
     // from the page.

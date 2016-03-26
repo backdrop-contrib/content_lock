@@ -1,18 +1,23 @@
--- SUMMARY --
 
+The "Content Lock Timeout" module
+
+SUMMARY
+=======
 This module extends content_lock to automatically break stale
 locks. It has a configurable stale lock timeout and will break locks
 through cron. It can also check for a stale lock and break it when
 another user tries to edit a node.
 
--- REQUIREMENTS --
-
-Working cron, if you wish to make use of automated check-ins.  If your
-hoster doesn't allow you to access cron take a look at Poormanscron
+REQUIREMENTS
+============
+Working with cron, if you wish to make use of automated check-ins.
+If your hoster doesn't allow you to access cron take a look at Poormanscron
 (http://drupal.org/project/poormanscron) or enable the ``Break stale
 locks on edit'' option to break stale locks as needed.
 
--- INSTALLTION --
+Installation and configuration
+==============================
+https://www.drupal.org/project/content_lock
 
 1. This module is shipped with the content_lock module. After
    installing that module, just enable this one from drupal's

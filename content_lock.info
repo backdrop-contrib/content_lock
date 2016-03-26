@@ -1,4 +1,4 @@
-name = "Content locking (edit lock)"
+name = "Content Lock"
 description = "Prevents multiple users from trying to edit a single node simultaneously to prevent edit conflicts."
 core = 7.x
 dependencies[] = filter
