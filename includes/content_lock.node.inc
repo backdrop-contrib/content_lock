@@ -97,8 +97,11 @@ function content_lock_node_form_handler(&$form, &$form_state, $form_id) {
         //   lock the node manually using an AJAX call with a proper CSRF token.
         $menu_item = menu_get_item();
         if (empty($_GET['content_lock_token']) || !drupal_valid_token($_GET['content_lock_token'], $menu_item['href'])) {
+          // Add ajax library.
+          drupal_add_library('system', 'drupal.ajax');
+
           drupal_set_message(t('The page you are editing could not be locked automatically. Please !link to make sure other people cannot accidentally overwrite your changes.', array(
-            '!link' => l(t('lock the page'), 'nojs/content_lock/' . $nid . '/lock/' . drupal_get_token($nid), array('attributes' => array('class' => array('use-ajax')))),
+            '!link' => l(t('lock the page'), 'ajax/content_lock/' . $nid . '/lock/' . drupal_get_token($nid) . '/nojs/', array('attributes' => array('class' => array('use-ajax')))),
           )), 'error');
           if (!content_lock_is_path_protected($menu_item['path'])) {
             watchdog('content_lock', 'Attempt to load the node_form form at menu path %path which is not protected from CSRF. Developers who want to create custom node editing pages and protect them with hook_content_lock_path_protected() or use protection_menu_token module to protect this path.', array('%path' => $menu_item['path']), WATCHDOG_WARNING);

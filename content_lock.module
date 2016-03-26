@@ -108,17 +108,19 @@ function content_lock_menu() {
     'file' => 'includes/content_lock.pages.inc',
     'weight' => 5,
   );
-  $items['ajax/content_lock/%node/lock/%'] = array(
+  $items['ajax/content_lock/%/lock/%'] = array(
     'page callback' => 'content_lock_node_ajax_callback',
     'page arguments' => array(2, 4),
     'access callback' => 'user_access',
     'access arguments' => array('check out documents'),
+    'type' => MENU_CALLBACK,
     'file' => 'includes/content_lock.ajax.inc',
   );
   $items['ajax/content_lock/%/canceledit'] = array(
     'page callback' => 'content_lock_release_own_item',
     'page arguments' => array(2, FALSE, FALSE),
     'access callback' => 'user_access',
+    'type' => MENU_CALLBACK,
     'file' => 'includes/content_lock.pages.inc',
   );
   $items['admin/config/content/content_lock'] = array(
