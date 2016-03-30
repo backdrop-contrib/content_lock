@@ -43,7 +43,7 @@ function content_lock_overview($account = NULL) {
   $query = db_select('content_lock', 'c')
     ->extend('TableSort')
     ->fields('c');
-  $n = $query->join('node', 'n', '%alias.nid = c.nid');
+  $n = $query->join('node', 'n', '%alias.nid = c.entity_id');
   $query->fields($n, array('title'));
   $u = $query->join('users', 'u', '%alias.uid = c.uid');
   $query->fields($u, array('name'));
@@ -54,15 +54,15 @@ function content_lock_overview($account = NULL) {
 
   $rows = array();
   foreach ($query->execute() as $data) {
-    $url = $uid ? "admin/content/" . $data->nid . "/content_lock/releaseown" : 'admin/content/content_lock/release/' . $data->nid;
+    $url = $uid ? "admin/content/" . $data->entity_id . "/content_lock/releaseown" : 'admin/content/content_lock/release/' . $data->entity_id;
     $row = array();
-    $row[] = l($data->title, "node/$data->nid");
+    $row[] = l($data->title, "node/$data->entity_id");
     if (!$uid) {
       $row[] = theme('username', array('account' => user_load($data->uid)));
     }
     $row[] = format_date($data->timestamp, 'small');
     if ($uid == $user->uid || user_access('administer checked out documents')) {
-      $row[] = l(t('release lock'), $url, array('query' => array('token' => content_lock_get_release_token($data->nid))));
+      $row[] = l(t('release lock'), $url, array('query' => array('token' => content_lock_get_release_token($data->entity_id))));
     }
     $rows[] = $row;
   }

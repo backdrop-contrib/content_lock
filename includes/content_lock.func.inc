@@ -18,84 +18,6 @@ function _content_lock_form_handler(&$form, &$form_state, $form_id, $callback = 
 }
 
 /**
- * Add unload js.
- *
- * @param array $form
- *   Form.
- * @param array $form_state
- *   Form state.
- *
- * @return mixed
- *   Form array
- */
-function _content_lock_add_unload_js(&$form, $form_state) {
-  $path = drupal_get_path('module', 'content_lock');
-  drupal_add_js($path . '/js/content_lock.url.js', array('group' => JS_LIBRARY));
-  drupal_add_js($path . '/js/content_lock.core.js', array('group' => JS_LIBRARY));
-  drupal_add_js($path . '/js/content_lock.init.js', array('group' => JS_DEFAULT));
-
-  $nid = empty($form['nid']['#value']) ? NULL : $form['nid']['#value'];
-  $internal_urls = array();
-  $internal_form_selectors = array();
-
-  // We're on a locked revision reversion page.
-  if (!empty($form['#node_revision']->nid)) {
-    $nid = $form['#node_revision']->nid;
-    // Don't ask the user if he wants to leave the page when
-    // cancelling a reversion.
-    $internal_urls[] = $form['actions']['cancel']['#href'];
-    $internal_form_selectors[] = '.confirmation';
-  }
-
-  $internal_urls[] = 'node/' . $nid . '/edit';
-  $internal_form_selectors[] = 'form.node-form';
-
-  // Check lock status.
-  $lock = content_lock_fetch_lock($nid);
-  if ($lock) {
-    $lock_ajax_key = $lock->ajax_key;
-  }
-  else {
-    $lock_ajax_key = FALSE;
-  }
-
-  // Get tokens.
-  $token = content_lock_get_release_token($nid);
-
-  // Prepare settings.
-  $settings = array(
-    'nid' => $nid,
-    'ajax_key' => $lock_ajax_key,
-    'token' => $token,
-    'unload_js_message_enable' => variable_get('content_lock_unload_js_message_enable', TRUE),
-    'internal_urls' => implode('|', $internal_urls),
-    'internal_forms' => implode(', ', $internal_form_selectors),
-  );
-  if ($settings['unload_js_message_enable']) {
-    $settings['unload_js_message'] = variable_get('content_lock_unload_js_message', 'If you proceed, ALL of your changes will be lost.');
-  }
-  /*
-   * Workaround for http://drupal.org/node/1525784 where this function
-   * is called multiple times when doing a file field AJAX upload and
-   * array_merge_recursive() is used instead of
-   * drupal_array_merge_deep_array() to construct the Drupal.settings
-   * value. Not calling drupal_add_js() multiple times deprives
-   * file_ajax_upload() of the ability to mess up here ;-).
-   */
-  $called =& drupal_static(__FUNCTION__ . '__called');
-  if (!empty($called)) {
-    $called++;
-
-    return $form;
-  }
-  $called = 1;
-
-  drupal_add_js(array('content_lock' => $settings), 'setting');
-
-  return $form;
-}
-
-/**
  * Check lock status.
  *
  * @param int $uid
@@ -106,9 +28,10 @@ function _content_lock_add_unload_js(&$form, $form_state) {
  * @return bool
  *    Return TRUE OR FALSE.
  */
-function _content_lock_still_locked($uid, $nid) {
+function _content_lock_still_locked($uid, $entity_id, $entity_type = 'node') {
   $query = db_select('content_lock', 'c')
-    ->condition('nid', $nid)
+    ->condition('entity_id', $entity_id)
+    ->condition('entity_type', $entity_type)
     ->condition('uid', $uid)
     ->countQuery();
   $result = $query->execute();
@@ -179,7 +102,7 @@ function _content_lock_show_warnings() {
  * @param int $uid
  *    User ID.
  */
-function _content_lock_warn_pending_locks($uid) {
+function _content_lock_show_warnings_pending($uid) {
   // Cache.
   static $warned_nodes = array();
   static $content_lock_messages_printed = FALSE;
@@ -187,34 +110,67 @@ function _content_lock_warn_pending_locks($uid) {
     return;
   }
 
-  if (array_key_exists($uid, $warned_nodes)) {
-    // Placeholder.
-  }
-  else {
+  if (!array_key_exists($uid, $warned_nodes)) {
     // Load form db.
     $warned_nodes[$uid] = array();
     $query = db_select('content_lock', 'c')
-      ->fields('c', array('nid'))
+      ->fields('c', array('entity_id'))
+      ->fields('c', array('entity_type'))
       ->condition('c.uid', $uid);
-    $n = $query->leftJoin('node', 'n', '%alias.nid = c.nid');
+    $n = $query->leftJoin('node', 'n', '%alias.nid = c.entity_id');
     $query->fields($n, array('title'));
 
+    // Fetch locked entities.
     foreach ($query->execute() as $lock) {
       $warned_nodes[$uid][] = $lock;
     }
   }
 
-  // Load module inc file.
-  module_load_include('inc', 'content_lock', 'includes/content_lock.func');
-
   foreach ($warned_nodes[$uid] as $lock) {
-    $nodetitle_link = l($lock->title, "node/{$lock->nid}");
-    $token = content_lock_get_release_token($lock->nid);
-    $releasethelock_link = l(t('release the lock'), "admin/content/{$lock->nid}/content_lock/releaseown", array('query' => array('token' => $token)));
+    $nodetitle_link = l($lock->title, "node/{$lock->entity_id}");
+    $token = content_lock_get_release_token($lock->entity_id);
+    $releasethelock_link = l(t('release the lock'), "admin/content/{$lock->entity_id}/content_lock/releaseown", array('query' => array('token' => $token)));
     _content_lock_save_lock_warning(t("The node '!nodetitle_link' is locked by you. You may want to '!releasethelock_link' in order to allow others to edit.", array(
       '!nodetitle_link' => $nodetitle_link,
       '!releasethelock_link' => $releasethelock_link,
-    )), $lock->nid);
+    )), $lock->entity_id);
   }
   $content_lock_messages_printed = TRUE;
+}
+
+/**
+ * Save locking into database.
+ */
+function _content_lock_locking_save($entity_id, $uid, $entity_type = 'node') {
+  $result = db_merge('content_lock')
+    ->key(array(
+      'entity_id' => $entity_id,
+      'entity_type' => $entity_type,
+    ))
+    ->fields(array(
+      'entity_id' => $entity_id,
+      'entity_type' => $entity_type,
+      'uid' => $uid,
+      'timestamp' => REQUEST_TIME,
+      'ajax_key' => rand(),
+    ))
+    ->execute();
+
+  return $result;
+}
+
+/**
+ * Delete locking item from database.
+ */
+function _content_lock_locking_delete($entity_id, $uid, $entity_type = 'node') {
+  $query = db_delete('content_lock')
+    ->condition('entity_type', $entity_type)
+    ->condition('entity_id', $entity_id);
+  if (!empty($uid)) {
+    $query->condition('uid', $uid);
+  }
+
+  $result = $query->execute();
+
+  return $result;
 }
