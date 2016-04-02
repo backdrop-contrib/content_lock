@@ -242,7 +242,7 @@ function content_lock_preprocess_link(&$vars) {
  * Implements hook_form_alter().
  */
 function content_lock_form_alter(&$form, &$form_state, $form_id) {
-  if ((isset($form['type']) && $form['type']['#value'] . '_node_form' == $form_id) || $form_id == 'node_revision_revert_confirm') {
+  if ((isset($form['type']['#value']) && $form['type']['#value'] . '_node_form' == $form_id) || $form_id == 'node_revision_revert_confirm') {
     // Load module inc file.
     module_load_include('inc', 'content_lock', 'includes/content_lock.func');
     // Load node form handler.
