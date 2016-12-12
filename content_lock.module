@@ -120,6 +120,7 @@ function content_lock_menu() {
     'page callback' => 'content_lock_release_own_item',
     'page arguments' => array(2, FALSE, FALSE),
     'access callback' => 'user_access',
+    'access arguments' => array('check out documents'),
     'type' => MENU_CALLBACK,
     'file' => 'includes/content_lock.pages.inc',
   );
