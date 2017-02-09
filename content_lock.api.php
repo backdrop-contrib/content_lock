@@ -47,6 +47,27 @@ function hook_content_lock_path_protected($path) {
 }
 
 /**
+ * Alter the protected path and return grants/denies.
+ *
+ * @param array $protected
+ *
+ * @param string $path
+ *   The path to check protection for.
+ *
+ */
+function hook_content_lock_path_protected_alter(&$protected, $path) {
+  // If TRUE is in array, path is protected.
+  if (in_array(TRUE, $protected)) {
+    // Set this path as not protected.
+    $protected = array();
+  }
+  else {
+    // Set this path as protected path.
+    $protected['custom_module'] = TRUE;
+  }
+}
+
+/**
  * Determine if locking should be disabled for a given node.
  *
  * This hook is called from content_lock_form_alter() before it
