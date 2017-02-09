@@ -64,11 +64,11 @@ function content_lock_timeout_cron() {
   // We call content_lock_release() for each lock so that the
   // hook_content_lock_released may be invoked.
   $query = db_select('content_lock', 'c')
-    ->fields('c', array('nid'))
+    ->fields('c', array('entity_id'))
     ->condition('c.timestamp', $last_valid_time, '<');
   $count = 0;
   foreach ($query->execute() as $obj) {
-    content_lock_release($obj->nid);
+    content_lock_release($obj->entity_id);
     $count++;
   }
 
