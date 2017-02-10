@@ -79,6 +79,7 @@ function content_lock_menu() {
     'page callback' => 'content_lock_release_own_item',
     'page arguments' => array(2, FALSE, FALSE),
     'access callback' => 'user_access',
+    'access arguments' => array('check out documents'),
   );
   $items['ajax/content_lock/%node/lock/%'] = array(
     'page callback' => 'content_lock_node_ajax_callback',
