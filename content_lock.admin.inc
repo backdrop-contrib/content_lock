@@ -13,7 +13,7 @@ function content_lock_admin_settings() {
 
   $form['#attached'] = array(
     'js' => array(
-      drupal_get_path('module', 'content_lock') . '/js/content_lock.admin.js',
+      drupal_get_path('module', 'content_lock') . '/content_lock.admin.js',
     ),
   );
 

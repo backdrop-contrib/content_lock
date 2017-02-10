@@ -120,7 +120,7 @@ function content_lock_timeout_node_prepare($node) {
   ) {
     content_lock_release($node->nid, $lock->uid);
 
-    if (content_lock_verbose()) {
+    if (_content_lock_verbose()) {
       $username = theme('username', array('account' => user_load($lock->uid)));
       $date = format_date($lock->timestamp, 'medium');
       $stale_time = format_interval($last_valid_time - $lock->timestamp);
@@ -140,7 +140,7 @@ function content_lock_timeout_node_prepare($node) {
  * Informs user that his lock will be considered stale.
  */
 function content_lock_timeout_content_lock_locked($nid, $uid) {
-  if (content_lock_verbose()) {
+  if (_content_lock_verbose()) {
     $on_edit = '';
     if (variable_get('content_lock_timeout_on_edit', TRUE)) {
       $on_edit = ' and up for grabs';
