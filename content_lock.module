@@ -113,6 +113,20 @@ function content_lock_admin_paths() {
 }
 
 /**
+ * Implements hook_drupal_goto_alter().
+ */
+function content_lock_drupal_goto_alter(&$path, &$options, &$http_response_code) {
+  // Add content lock token.
+  if (module_exists('entity_translation') && fnmatch('node/*/edit/add/*/*', $path) && !isset($options['content_lock_token'])) {
+    $options = array(
+      'query' => array(
+        'content_lock_token' => drupal_get_token($path),
+      ),
+    );
+  }
+}
+
+/**
  * Check if an internal Drupal path should be protected with a token.
  *
  * Adds requirements that certain path be accessed only through tokenized URIs
@@ -158,6 +172,7 @@ function content_lock_content_lock_path_protected($path) {
   if (strpos($path, 'node/') === 0) {
     $paths_patterns = array(
       'node/*/edit',
+      'node/*/edit/*',
       'node/*/revisions/*/revert',
     );
     foreach ($paths_patterns as $protected_pattern) {
