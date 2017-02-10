@@ -707,7 +707,7 @@ function content_lock_node($nid, $uid, $quiet = FALSE) {
       );
 
       if (_content_lock_verbose() && !$quiet) {
-        drupal_set_message(t('This document is now locked against simultaneous editing. It will unlock when you navigate elsewhere.'), 'status', FALSE);
+        drupal_set_message(t('This document is now locked against simultaneous editing.'), 'status', FALSE);
       }
       module_invoke_all('content_lock_locked', $nid, $uid);
     }
