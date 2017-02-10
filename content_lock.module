@@ -36,7 +36,6 @@ function content_lock_hook_info() {
     'content_lock_node_type_blacklist_alter',
     'content_lock_locked',
     'content_lock_release',
-    'content_lock_entity_lockable',
     'content_lock_node_lockable',
   );
 
@@ -454,21 +453,8 @@ function content_lock_release($nid, $uid = NULL) {
 /**
  * Check whether a node is configured to be protected by content_lock.
  */
-function content_lock_is_lockable($entity, $entity_type = 'node') {
-  list($entity_id, , $bundle) = entity_extract_ids($entity_type, $entity);
-  // Only call hooks while a valid entity with entity id.
-  if ($entity_id) {
-    if ($entity_type == 'node') {
-      // Respect legacy hook.
-      return !in_array(FALSE, module_invoke_all('content_lock_node_lockable', $entity));
-    }
-    else {
-      return !in_array(FALSE, module_invoke_all('content_lock_entity_lockable', $entity, $entity_id, $entity_type, $bundle));
-    }
-  }
-
-  // Always return FALSE.
-  return FALSE;
+function content_lock_is_lockable($node) {
+  return !in_array(FALSE, module_invoke_all('content_lock_node_lockable', $node));
 }
 
 /**
@@ -518,14 +504,9 @@ function content_lock_verbose() {
  * Implements hook_node_validate().
  */
 function content_lock_node_validate($node, $form, &$form_state) {
-  // Only locking existing nodes with NID.
-  if (!isset($node->nid)) {
-    return;
-  }
+  global $user;
 
-  if (content_lock_is_lockable($node) && user_access('check out documents')) {
-    global $user;
-    
+  if (isset($node->nid) && content_lock_is_lockable($node) && user_access('check out documents')) {
     // Existing node. Check if we still own the lock.
     if ($lock = content_lock_fetch_lock($node->nid)) {
       if ($lock->uid != $user->uid) {
