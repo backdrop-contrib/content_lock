@@ -34,7 +34,7 @@ function content_lock_node_form_handler(&$form, &$form_state, $form_id) {
 
   // Check node body or format is valid.
   if (!empty($node->body) && is_array($node->body) && !empty($node->body[$node->language][0]['format'])) {
-    // The content_lock_is_lockable() needs to know the original
+    // The _content_lock_is_lockable_node() needs to know the original
     // node format. We either dig up a stashed content_lock_old_format or
     // initialize it here.
     // Only touch node edit forms and then only if the form is `normal'
@@ -106,7 +106,7 @@ function content_lock_node_form_handler(&$form, &$form_state, $form_id) {
         }
         else {
           // Finally set the lock if everything passed.
-          if (content_lock_locking($nid, $user->uid) == FALSE) {
+          if (content_lock_node($nid, $user->uid) == FALSE) {
             // Could not lock node, it's locked by someone else.
             drupal_goto($destination);
           }

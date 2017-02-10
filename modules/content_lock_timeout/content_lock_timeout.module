@@ -15,6 +15,7 @@ function content_lock_timeout_form_content_lock_admin_settings_alter(&$form, &$f
     '#description' => t('Configure automatic stale lock breaking.'),
     '#collapsible' => TRUE,
   );
+
   $form['content_lock_timeout']['content_lock_timeout_minutes'] = array(
     '#type' => 'textfield',
     '#title' => t('Lock timeout'),
@@ -36,6 +37,7 @@ function content_lock_timeout_form_content_lock_admin_settings_alter(&$form, &$f
 
   // Apply some form beautification.
   $form['buttons']['#weight'] = 2;
+
   $form['#validate'][] = 'content_lock_timeout_admin_settings_validate';
 }
 
