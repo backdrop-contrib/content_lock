@@ -245,10 +245,7 @@ function content_lock_form_alter(&$form, &$form_state, $form_id) {
   if ((isset($form['type']) && $form['type']['#value'] . '_node_form' == $form_id) || $form_id == 'node_revision_revert_confirm') {
     // Load module inc file.
     module_load_include('inc', 'content_lock', 'includes/content_lock.func');
-    // Load node form handler.
     _content_lock_form_handler($form, $form_state, $form_id, 'content_lock_form_node_handler');
-    // Load scripts after form build.
-    $form['#after_build'][] = 'content_lock_js';
   }
 }
 
@@ -329,11 +326,10 @@ function content_lock_get_release_token($nid) {
  * @return object
  *   The lock for the node. FALSE, if the document is not locked.
  */
-function content_lock_fetch_lock($entity_id, $entity_type = 'node') {
+function content_lock_fetch_lock($nid) {
   $query = db_select('content_lock', 'c')
     ->fields('c')
-    ->condition('c.entity_type', $entity_type)
-    ->condition('c.entity_id', $entity_id);
+    ->condition('c.nid', $nid);
   $u = $query->leftJoin('users', 'u', '%alias.uid = c.uid');
   $query->fields($u, array('name'));
 
@@ -375,64 +371,68 @@ function content_lock_lock_owner($lock) {
  * @return bool
  *   FALSE, if a document has already been locked by someone else.
  */
-function content_lock_locking($entity_id, $uid, $entity_type = 'node', $quiet = FALSE) {
-  // Load module inc file.
-  module_load_include('inc', 'content_lock', 'includes/content_lock.func');
-  // Check locking status.
-  $lock = content_lock_fetch_lock($entity_id, $entity_type);
+function content_lock_locking($nid, $uid, $quiet = FALSE) {
+  $lock = content_lock_fetch_lock($nid);
 
-  // No lock yet.
-  if ($lock === FALSE || !is_object($lock)) {
-    // Save locking into database.
-    _content_lock_locking_save($entity_id, $uid, $entity_type);
-
-    if (content_lock_verbose() && !$quiet) {
-      drupal_set_message(t('This document is now locked against simultaneous editing.'), 'status', FALSE);
+  if ($lock != FALSE && $lock->uid != $uid) {
+    $message = content_lock_lock_owner($lock);
+    if (user_access('administer checked out documents')) {
+      $url = "admin/content/content_lock/release/$nid";
     }
-    // Post locking hook.
-    module_invoke_all('content_lock_locked', $entity_id, $uid, $entity_type);
 
-    // Send success flag.
-    return TRUE;
+    if (isset($url)) {
+      $token = content_lock_get_release_token($nid);
+      $message .= '<br />';
+      $message .= t('Click !here to check back in now.', array(
+        '!here' => l(t('here'), $url, array(
+          'query' => array(
+            'token' => $token,
+            'destination' => $_GET['q'],
+          ),
+        )),
+      ));
+    }
+    if (!empty($message)) {
+      drupal_set_message($message, 'warning', FALSE);
+    }
+
+    return FALSE;
   }
   else {
-    // Currently locking by other user.
-    if ($lock->uid != $uid) {
-      $message = content_lock_lock_owner($lock);
-      // Higher permission user can unblock.
-      if (user_access('administer checked out documents')) {
-        $url = 'admin/content/content_lock/release/' . $entity_id;
-        $token = content_lock_get_release_token($entity_id);
-        $message .= '<br />';
-        $message .= t('Click !here to release the lock right now.', array(
-          '!here' => l(t('here'), $url, array(
-            'query' => array(
-              'token' => $token,
-              'destination' => $_GET['q'],
-            ),
-          )),
-        ));
+    // No lock yet, create one.
+    if ($lock == FALSE) {
+      // Lock node.
+      $data = array(
+        'nid' => $nid,
+        'uid' => $uid,
+        'timestamp' => time(),
+        'ajax_key' => rand(),
+      );
+      drupal_write_record(
+        'content_lock',
+        $data
+      );
+
+      if (content_lock_verbose() && !$quiet) {
+        drupal_set_message(t('This document is now locked against simultaneous editing.'), 'status', FALSE);
       }
-
-      // Send message.
-      drupal_set_message($message, 'warning', FALSE);
-
-      // Return FALSE flag.
-      return FALSE;
+      module_invoke_all('content_lock_locked', $nid, $uid);
     }
     else {
-      // Save locking into database.
-      _content_lock_locking_save($entity_id, $uid, $entity_type);
-
-      // Locked by current user.
-      if (content_lock_verbose() && !$quiet) {
-        drupal_set_message(t('This document is now locked by you against simultaneous editing.'), 'status', FALSE);
+      /* A lock already exists: update its AJAX key */
+      $lock->ajax_key = rand();
+      if (!drupal_write_record('content_lock', $lock, array('nid'))) {
+        /*
+         * we encountered a race condition where the lock was deleted
+         * between when we loaded it and when we tried to update it
+         * with a new key. Recreate the lock then:
+         */
+        drupal_write_record('content_lock', $lock);
       }
-
-      // Send success flag.
-      return TRUE;
     }
   }
+
+  return TRUE;
 }
 
 /**
@@ -443,13 +443,14 @@ function content_lock_locking($entity_id, $uid, $entity_type = 'node', $quiet = 
  * @param int $uid
  *    If set, verify that a lock belongs to this user prior to release.
  */
-function content_lock_release($entity_id, $uid = NULL, $entity_type = 'node') {
-  // Load module inc file.
-  module_load_include('inc', 'content_lock', 'includes/content_lock.func');
-  // Delete locking item from database.
-  _content_lock_locking_delete($entity_id, $uid, $entity_type);
-
-  module_invoke_all('content_lock_release', $entity_id, $entity_type);
+function content_lock_release($nid, $uid = NULL) {
+  $query = db_delete('content_lock')
+    ->condition('nid', $nid);
+  if (!empty($uid)) {
+    $query->condition('uid', $uid);
+  }
+  $query->execute();
+  module_invoke_all('content_lock_release', $nid);
 }
 
 /**
@@ -571,12 +572,9 @@ function content_lock_node_view($node, $view_mode, $langcode) {
   // Load module inc file.
   module_load_include('inc', 'content_lock', 'includes/content_lock.func');
 
-  if ($view_mode != 'full' || !content_lock_is_lockable($node)) {
-    return;
-  }
-
-  // Preview mode.
-  if (!empty($node->in_preview)) {
+  if ($view_mode != 'full'
+    || !content_lock_is_lockable($node)
+  ) {
     return;
   }
 
@@ -585,8 +583,10 @@ function content_lock_node_view($node, $view_mode, $langcode) {
     $messages_shown = TRUE;
   }
 
-  // Check if the user has pending locks and send message.
-  _content_lock_show_warnings_pending($user->uid);
+  if (empty($node->in_preview)) {
+    // Check if the user has pending locks and send message.
+    _content_lock_warn_pending_locks($user->uid);
+  }
 }
 
 /**
@@ -598,64 +598,6 @@ function content_lock_user_logout($account) {
 
   // Removing all locks, as the user logs out.
   _content_lock_release_all_user_locks($account->uid);
-}
-
-/**
- * Load module javascript.
- */
-function content_lock_js($form, $form_state = array()) {
-  if (variable_get('content_lock_unload_js', TRUE)) {
-    // Add content_lock javascript.
-    $path = drupal_get_path('module', 'content_lock');
-    drupal_add_js($path . '/js/content_lock.url.js', array('group' => JS_LIBRARY));
-    drupal_add_js($path . '/js/content_lock.core.js', array('group' => JS_LIBRARY));
-    drupal_add_js($path . '/js/content_lock.init.js', array('group' => JS_DEFAULT));
-
-    $nid = empty($form['nid']['#value']) ? NULL : $form['nid']['#value'];
-    $internal_urls = array();
-    $internal_form_selectors = array();
-
-    // We're on a locked revision reversion page.
-    if (!empty($form['#node_revision']->nid)) {
-      $nid = $form['#node_revision']->nid;
-      // Don't ask the user if he wants to leave the page when
-      // cancelling a reversion.
-      $internal_urls[] = $form['actions']['cancel']['#href'];
-      $internal_form_selectors[] = '.confirmation';
-    }
-
-    $internal_urls[] = 'node/' . $nid . '/edit';
-    $internal_form_selectors[] = 'form.node-form';
-
-    // Check lock status.
-    $lock = content_lock_fetch_lock($nid);
-    if ($lock) {
-      $lock_ajax_key = $lock->ajax_key;
-    }
-    else {
-      $lock_ajax_key = FALSE;
-    }
-
-    // Get tokens.
-    $token = content_lock_get_release_token($nid);
-
-    // Prepare settings.
-    $settings = array(
-      'nid' => $nid,
-      'ajax_key' => $lock_ajax_key,
-      'token' => $token,
-      'unload_js_message_enable' => variable_get('content_lock_unload_js_message_enable', TRUE),
-      'internal_urls' => implode('|', $internal_urls),
-      'internal_forms' => implode(', ', $internal_form_selectors),
-    );
-    if ($settings['unload_js_message_enable']) {
-      $settings['unload_js_message'] = variable_get('content_lock_unload_js_message', 'If you proceed, ALL of your changes will be lost.');
-    }
-
-    drupal_add_js(array('content_lock' => $settings), 'setting');
-  }
-
-  return $form;
 }
 
 /**

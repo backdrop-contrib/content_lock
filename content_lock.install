@@ -36,20 +36,13 @@ function content_lock_schema() {
   $schema['content_lock'] = array(
     'description' => 'content lock module table.',
     'fields' => array(
-      'entity_id' => array(
-        'description' => 'The primary identifier for an entity.',
+      'nid' => array(
+        'description' => 'The primary identifier for a node.',
         'type' => 'int',
         'size' => 'normal',
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
-      ),
-      'entity_type' => array(
-        'description' => 'The type of an entity.',
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => 'node',
       ),
       'uid' => array(
         'description' => 'User that holds the lock.',
@@ -79,13 +72,7 @@ function content_lock_schema() {
     'indexes' => array(
       'user' => array('uid'),
     ),
-    'primary key' => array('entity_id', 'entity_type'),
-    'foreign keys' => array(
-      'uid' => array(
-        'table' => 'users',
-        'columns' => array('uid' => 'uid'),
-      ),
-    ),
+    'primary key' => array('nid'),
   );
 
   return $schema;
@@ -108,36 +95,4 @@ function content_lock_update_6200() {
     ));
 
   return $ret;
-}
-
-/**
- * Add entity ID and type support.
- */
-function content_lock_update_7200() {
-  if (!db_field_exists('content_lock', 'entity_type')) {
-    $fields['entity_type'] = array(
-      'description' => 'The type of an entity.',
-      'type' => 'varchar',
-      'length' => 255,
-      'not null' => TRUE,
-      'default' => 'node',
-    );
-    db_add_field('content_lock', 'entity_type', $fields['entity_type']);
-  }
-
-  if (db_field_exists('content_lock', 'nid')) {
-    $fields['entity_id'] = array(
-      'description' => 'The primary identifier for an entity.',
-      'type' => 'int',
-      'size' => 'normal',
-      'unsigned' => TRUE,
-      'not null' => TRUE,
-      'default' => 0,
-    );
-    db_change_field('content_lock', 'nid', 'entity_id', $fields['entity_id']);
-  }
-
-  // Update primary keys.
-  db_drop_primary_key('content_lock');
-  db_add_primary_key('content_lock', array('entity_id', 'entity_type'));
 }

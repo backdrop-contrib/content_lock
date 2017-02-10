@@ -55,7 +55,13 @@ function content_lock_node_form_handler(&$form, &$form_state, $form_id) {
     );
   }
 
-  // Add skip locking hook for other modules.
+  // General preconditions for locking.
+  // Veto-API. Let other modules veto the locking - so force skipping out
+  // of any conditions they want.
+  // We will use || logic, so if any module denies locking then we
+  // deny locking.
+  // Be sure to notice that content_lock also implements this api
+  // for his own vetos.
   $skip_lock = FALSE;
   $result = module_invoke_all('content_lock_skip_locking', $node, $form_id, $form, $form_state);
   foreach ($result as $bool) {
@@ -64,29 +70,59 @@ function content_lock_node_form_handler(&$form, &$form_state, $form_id) {
     }
   }
 
-  if ($skip_lock === FALSE) {
+  if ($skip_lock == FALSE) {
     // Adding cancel button, if configured.
     if (variable_get('content_lock_admin_cancelbutton', TRUE)) {
       _content_lock_node_form_handler_button($form, $form_state, $form_id);
     }
-
-    $menu_item = menu_get_item();
-    if (empty($_GET['content_lock_token']) || !drupal_valid_token($_GET['content_lock_token'], $menu_item['href'])) {
-      // Add ajax library.
-      drupal_add_library('system', 'drupal.ajax');
-
-      drupal_set_message(t('The page you are editing could not be locked automatically. Please !link to make sure other people cannot accidentally overwrite your changes.', array(
-        '!link' => l(t('lock the page'), 'ajax/content_lock/' . $nid . '/lock/' . drupal_get_token($nid) . '/nojs/', array('attributes' => array('class' => array('use-ajax')))),
-      )), 'error');
-      if (!content_lock_is_path_protected($menu_item['path'])) {
-        watchdog('content_lock', 'Attempt to load the node_form form at menu path %path which is not protected from CSRF. Developers who want to create custom node editing pages and protect them with hook_content_lock_path_protected() or use protection_menu_token module to protect this path.', array('%path' => $menu_item['path']), WATCHDOG_WARNING);
-      }
+    // If we are handling a preview, skip locking.
+    if (!empty($form_state['rebuild']) && $form_state['rebuild'] == TRUE) {
+      // Placeholder.
     }
+    // If the form did not get submitted we show it the first time
+    // so try to get the lock if possible.
     else {
-      // Finally set the lock if everything passed.
-      if (content_lock_locking($nid, $user->uid) == FALSE) {
-        // Could not lock node, it's locked by someone else.
-        drupal_goto($destination);
+      if ($form_state['submitted'] === FALSE) {
+        // Refuse to lock if a token is not present. This prevents a CSRF attack
+        // if a user is tricked into visiting pages that cause nodes to be
+        // locked.
+        // A CSRF token may be missing in these cases:
+        // - A node add/edit form is displayed on a path that is not protected
+        //   with a CSRF token. Please add the path to the list of protected
+        //   paths by implementing hook_content_lock_path_protected().
+        // - The CSRF token has not been added to the URL as a query parameter,
+        //   for example because the user entered node/1/edit directly in the
+        //   address bar of the browser. To avoid CSRF attacks we do not lock
+        //   the node automatically, but still give the user the possibility to
+        //   lock the node manually using an AJAX call with a proper CSRF token.
+        $menu_item = menu_get_item();
+        if (empty($_GET['content_lock_token']) || !drupal_valid_token($_GET['content_lock_token'], $menu_item['href'])) {
+          // Add ajax library.
+          drupal_add_library('system', 'drupal.ajax');
+
+          drupal_set_message(t('The page you are editing could not be locked automatically. Please !link to make sure other people cannot accidentally overwrite your changes.', array(
+            '!link' => l(t('lock the page'), 'ajax/content_lock/' . $nid . '/lock/' . drupal_get_token($nid) . '/nojs/', array('attributes' => array('class' => array('use-ajax')))),
+          )), 'error');
+          if (!content_lock_is_path_protected($menu_item['path'])) {
+            watchdog('content_lock', 'Attempt to load the node_form form at menu path %path which is not protected from CSRF. Developers who want to create custom node editing pages and protect them with hook_content_lock_path_protected() or use protection_menu_token module to protect this path.', array('%path' => $menu_item['path']), WATCHDOG_WARNING);
+          }
+        }
+        else {
+          // Finally set the lock if everything passed.
+          if (content_lock_locking($nid, $user->uid) == FALSE) {
+            // Could not lock node, it's locked by someone else.
+            drupal_goto($destination);
+          }
+          // If we should lock or already have been locked, load the unload js.
+          // Don't use form alter but rather after build, so it works even for
+          // previews.
+          elseif (variable_get('content_lock_unload_js', TRUE)) {
+            // Load module inc file.
+            module_load_include('inc', 'content_lock', 'includes/content_lock.func');
+
+            $form['#after_build'][] = '_content_lock_add_unload_js';
+          }
+        }
       }
     }
   }

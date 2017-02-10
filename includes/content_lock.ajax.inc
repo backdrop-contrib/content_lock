@@ -23,13 +23,15 @@ function content_lock_node_ajax_callback($entity_id, $token, $ajax = NULL) {
 
   global $user;
 
-  // Lock current entity.
+  // Load module inc file.
+  module_load_include('inc', 'content_lock', 'includes/content_lock.func');
+
   content_lock_locking($entity_id, $user->uid);
 
   // Add the javascript that unlocks the node when the user navigates away
   // from the page.
   $form = array('nid' => array('#value' => $entity_id));
-  content_lock_js($form);
+  _content_lock_add_unload_js($form, array());
 
   if ($is_ajax) {
     $commands = array();
