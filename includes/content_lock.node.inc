@@ -129,7 +129,7 @@ function _content_lock_node_form_handler_button(&$form, $form_state, $form_id) {
         $form['actions']['cancel'] = array(
           '#type' => 'button',
           '#weight' => 2000,
-          '#value' => t('Cancel edit'),
+          '#value' => t('Cancel'),
           '#validate' => array('_content_lock_node_form_handler_cancel_submit'),
         );
 
