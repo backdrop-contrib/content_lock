@@ -610,10 +610,7 @@ function content_lock_js($form, $form_state = array()) {
     $path = drupal_get_path('module', 'content_lock');
     drupal_add_js($path . '/js/content_lock.url.js', array('group' => JS_LIBRARY));
     drupal_add_js($path . '/js/content_lock.core.js', array('group' => JS_LIBRARY));
-    drupal_add_js($path . '/js/content_lock.init.js', array(
-      'group' => JS_DEFAULT,
-      'weight' => 100,
-    ));
+    drupal_add_js($path . '/js/content_lock.init.js', array('group' => JS_DEFAULT));
 
     $nid = empty($form['nid']['#value']) ? NULL : $form['nid']['#value'];
     $internal_urls = array();
