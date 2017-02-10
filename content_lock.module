@@ -525,7 +525,7 @@ function content_lock_node_validate($node, $form, &$form_state) {
 
   if (content_lock_is_lockable($node) && user_access('check out documents')) {
     global $user;
-
+    
     // Existing node. Check if we still own the lock.
     if ($lock = content_lock_fetch_lock($node->nid)) {
       if ($lock->uid != $user->uid) {
@@ -582,7 +582,7 @@ function content_lock_node_view($node, $view_mode, $langcode) {
   }
 
   if (empty($node->in_preview)) {
-    // Check if the user has pending locks and send message.
+    // Check if the user has pending locks and warn him.
     _content_lock_warn_pending_locks($user->uid);
   }
 }
