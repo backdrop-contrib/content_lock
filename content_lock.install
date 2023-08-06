@@ -12,21 +12,22 @@
  * by default since this is the most common use-case.
  */
 function content_lock_install() {
-  user_role_grant_permissions(DRUPAL_AUTHENTICATED_RID, array('check out documents'));
+  user_role_grant_permissions(BACKDROP_AUTHENTICATED_ROLE, array('check out documents'));
+  // Dynamically generated variable data was detected on the following lines.
 }
 
 /**
  * Implements hook_uninstall().
  */
 function content_lock_uninstall() {
-  variable_del('content_lock_clear');
-  variable_del('content_lock_unload_js');
-  variable_del('content_lock_unload_js_message');
-  variable_del('content_lock_unload_js_message_enable');
-  variable_del('content_lock_admin_cancelbutton');
-  variable_del('content_lock_admin_verbose');
-  variable_del('content_lock_allowed_node_types');
-  variable_del('content_lock_allowed_formats');
+  config_clear('content_lock.settings', 'content_lock_clear');
+  config_clear('content_lock.settings', 'content_lock_unload_js');
+  config_clear('content_lock.settings', 'content_lock_unload_js_message');
+  config_clear('content_lock.settings', 'content_lock_unload_js_message_enable');
+  config_clear('content_lock.settings', 'content_lock_admin_cancelbutton');
+  config_clear('content_lock.settings', 'content_lock_admin_verbose');
+  config_clear('content_lock.settings', 'content_lock_allowed_node_types');
+  config_clear('content_lock.settings', 'content_lock_allowed_formats');
 }
 
 /**
@@ -78,21 +79,35 @@ function content_lock_schema() {
   return $schema;
 }
 
+// TODO The old hook_update_N functions cannot be applied to Backdrop.
+function content_lock_update_6200() { }
+
 /**
- * Implements hook_update_N().
+ * Implements hook_update_last_removed().
  */
-function content_lock_update_6200() {
-  $ret = array();
+function content_lock_update_last_removed() {
+  return 6200;
+}
 
-  db_add_field($ret, 'content_lock', 'ajax_key',
-    array(
-      'description' => 'A key which AJAX requests must prevent to prevent page reloads from breaking.',
-      'size' => 'normal',
-      'type' => 'int',
-      'unsigned' => TRUE,
-      'not null' => TRUE,
-      'default' => 0,
-    ));
+/**
+ * Migrate content_lock variables to config.
+ */
+function content_lock_update_1000() {
+  $config = config('content_lock.settings');
+  $config->set('content_lock_unload_js', update_variable_get('content_lock_unload_js', TRUE));
+  $config->set('content_lock_unload_js_message_enable', update_variable_get('content_lock_unload_js_message_enable', TRUE));
+  $config->set('content_lock_unload_js_message', update_variable_get('content_lock_unload_js_message', 'If you proceed, ALL of your changes will be lost.'));
+  $config->set('content_lock_admin_verbose', update_variable_get('content_lock_admin_verbose', TRUE));
+  $config->set('content_lock_admin_cancelbutton', update_variable_get('content_lock_admin_cancelbutton', TRUE));
+  $config->set('content_lock_allowed_node_types', update_variable_get('content_lock_allowed_node_types', array()));
+  $config->set('content_lock_allowed_formats', update_variable_get('content_lock_allowed_formats', array()));
+  $config->save();
 
-  return $ret;
+  update_variable_del('content_lock_unload_js');
+  update_variable_del('content_lock_unload_js_message_enable');
+  update_variable_del('content_lock_unload_js_message');
+  update_variable_del('content_lock_admin_verbose');
+  update_variable_del('content_lock_admin_cancelbutton');
+  update_variable_del('content_lock_allowed_node_types');
+  update_variable_del('content_lock_allowed_formats');
 }

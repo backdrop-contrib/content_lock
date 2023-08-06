@@ -29,21 +29,21 @@ class ContentLockViewsHandlerFieldLocked extends views_handler_field_boolean {
    * Render.
    */
   public function render($values) {
-    $value = $values->content_lock_timestamp ? TRUE : FALSE;
+    $value = $values->content_lock_timestamp?TRUE : FALSE;
     if (!empty($this->options['not'])) {
       $value = !$value;
     }
 
     switch ($this->options['type']) {
       case 'true-false':
-        return $value ? t('True') : t('False');
+        return $value?t('True') : t('False');
 
       case 'on-off':
-        return $value ? t('On') : t('Off');
+        return $value?t('On') : t('Off');
 
       case 'yes-no':
       default:
-        return $value ? t('Yes') : t('No');
+        return $value?t('Yes') : t('No');
     }
   }
 

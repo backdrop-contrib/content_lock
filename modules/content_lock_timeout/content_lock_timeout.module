@@ -6,9 +6,21 @@
  */
 
 /**
+ * Implements hook_config_info().
+ */
+function content_lock_timeout_config_info() {
+  $prefixes['content_lock_timeout.settings'] = array(
+    'label' => t('Content locking (edit lock) settings'),
+    'group' => t('Configuration'),
+  );
+  return $prefixes;
+}
+
+/**
  * Implements hook_form_FORM_ID_alter().
  */
 function content_lock_timeout_form_content_lock_admin_settings_alter(&$form, &$form_state) {
+  $config = config('content_lock.settings');
   $form['content_lock_timeout'] = array(
     '#type' => 'fieldset',
     '#title' => t('Lock Timeouts'),
@@ -21,18 +33,18 @@ function content_lock_timeout_form_content_lock_admin_settings_alter(&$form, &$f
     '#title' => t('Lock timeout'),
     '#description' => t('The maximum time in minutes that each lock may be kept. To disable breaking locks after a timeout, please !disable the Content Lock Timeout module.',
       array(
-        '!disable' => l(t('disable'), 'admin/build/modules', array(
-          'fragment' => 'edit-status-content-lock-timeout-wrapper',
-        )),
-      )
+      '!disable' => l(t('disable'), 'admin/build/modules', array(
+        'fragment' => 'edit-status-content-lock-timeout-wrapper',
+      )),
+    )
     ),
-    '#default_value' => variable_get('content_lock_timeout_minutes', 30),
+    '#default_value' => $config->get('content_lock_timeout_minutes'),
   );
   $form['content_lock_timeout']['content_lock_timeout_on_edit'] = array(
     '#type' => 'checkbox',
     '#title' => t('Break stale locks on edit'),
     '#description' => t("By default, stale locks will be broken when cron is run. This option enables checking for stale locks when a user clicks a node's Edit link, enabling lower lock timeout values without having to run cron every few minutes."),
-    '#default_value' => variable_get('content_lock_timeout_on_edit', TRUE),
+    '#default_value' => $config->get('content_lock_timeout_on_edit'),
   );
 
   // Apply some form beautification.
@@ -46,7 +58,7 @@ function content_lock_timeout_form_content_lock_admin_settings_alter(&$form, &$f
  */
 function content_lock_timeout_admin_settings_validate($form, &$form_state) {
   if (!is_numeric($form_state['values']['content_lock_timeout_minutes'])
-    || $form_state['values']['content_lock_timeout_minutes'] <= 0
+     || $form_state['values']['content_lock_timeout_minutes'] <= 0
   ) {
     form_set_error('content_lock_timeout_minutes', t('You must set your content lock timeout value to a positive number.'));
   }
@@ -60,7 +72,7 @@ function content_lock_timeout_admin_settings_validate($form, &$form_state) {
  * checkout module).
  */
 function content_lock_timeout_cron() {
-  $timeout_minutes = variable_get('content_lock_timeout_minutes', 30);
+  $timeout_minutes = config_get('content_lock.settings', 'content_lock_timeout_minutes');
   $last_valid_time = time() - 60 * $timeout_minutes;
 
   // We call content_lock_release() for each lock so that the
@@ -92,11 +104,12 @@ function content_lock_timeout_cron() {
  * maintained.
  */
 function content_lock_timeout_node_prepare($node) {
+  $config = config('content_lock.settings');
   global $user;
-  if (!variable_get('content_lock_timeout_on_edit', TRUE)) {
+  if (!$config->get('content_lock_timeout_on_edit')) {
     return;
   }
-  $timeout_minutes = variable_get('content_lock_timeout_minutes', 30);
+  $timeout_minutes = $config->get('content_lock_timeout_minutes');
 
   $last_valid_time = time() - 60 * $timeout_minutes;
   // This is a new, unsaved node (which thus can't be locked).
@@ -105,9 +118,9 @@ function content_lock_timeout_node_prepare($node) {
   // A different user owns the lock.
   // There already is a lock on this node.
   if (!empty($node->nid)
-    && is_object($lock = content_lock_fetch_lock($node->nid))
-    && $lock->uid != $user->uid
-    && $lock->timestamp < $last_valid_time
+     && is_object($lock = content_lock_fetch_lock($node->nid))
+     && $lock->uid != $user->uid
+     && $lock->timestamp < $last_valid_time
     // Now check a subset of the conditions that content_lock_form_alter()
     // checks before it sets a lock. Many of the checks don't apply because
     // we know the uid of the lock is different from the current user's uid
@@ -115,8 +128,8 @@ function content_lock_timeout_node_prepare($node) {
     // because there's already a lock on this node.
     // The user must have this permission to be able to lock.
     // A valid user is needed for locking.
-    && user_access('check out documents')
-    && ($user->uid > 0)
+     && user_access('check out documents')
+     && ($user->uid > 0)
   ) {
     content_lock_release($node->nid, $lock->uid);
 
@@ -124,12 +137,12 @@ function content_lock_timeout_node_prepare($node) {
       $username = theme('username', array('account' => user_load($lock->uid)));
       $date = format_date($lock->timestamp, 'medium');
       $stale_time = format_interval($last_valid_time - $lock->timestamp);
-      drupal_set_message(t('Breaking existing lock by !name so that you may edit this node. (This lock was set on @date and was @stale_time stale.)',
+      backdrop_set_message(t('Breaking existing lock by !name so that you may edit this node. (This lock was set on @date and was @stale_time stale.)',
         array(
-          '!name' => $username,
-          '@date' => $date,
-          '@stale_time' => $stale_time,
-        )));
+        '!name' => $username,
+        '@date' => $date,
+        '@stale_time' => $stale_time,
+      )));
     }
   }
 }
@@ -140,17 +153,18 @@ function content_lock_timeout_node_prepare($node) {
  * Informs user that his lock will be considered stale.
  */
 function content_lock_timeout_content_lock_locked($nid, $uid) {
+  $config = config('content_lock.settings');
   if (_content_lock_verbose()) {
     $on_edit = '';
-    if (variable_get('content_lock_timeout_on_edit', TRUE)) {
+    if ($config->get('content_lock_timeout_on_edit')) {
       $on_edit = ' and up for grabs';
     }
-    $time = format_interval(variable_get('content_lock_timeout_minutes', 30) * 60);
-    drupal_set_message(t('Your lock will be considered stale@on_edit in @time.',
+    $time = format_interval($config->get('content_lock_timeout_minutes') * 60);
+    backdrop_set_message(t('Your lock will be considered stale@on_edit in @time.',
       array(
-        '@on_edit' => $on_edit,
-        '@time' => $time,
-      )
+      '@on_edit' => $on_edit,
+      '@time' => $time,
+    )
     ));
   }
 }

@@ -105,7 +105,7 @@ function content_lock_views_data() {
 function content_lock_views_handlers() {
   return array(
     'info' => array(
-      'path' => drupal_get_path('module', 'content_lock') . '/views',
+      'path' => backdrop_get_path('module', 'content_lock') . '/views',
     ),
     'handlers' => array(
       'ContentLockViewsHandlerFieldLocked' => array(
