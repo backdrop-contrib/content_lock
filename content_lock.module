@@ -212,7 +212,7 @@ function content_lock_preprocess_menu_local_task(&$vars) {
   // Append a CSRF token to all paths that show the node add/edit form.
   if (content_lock_is_path_protected($vars['element']['#link']['path'])) {
     if (!isset($vars['element']['#link']['localized_options']['query']['content_lock_token'])) {
-      dpm($vars['element']['#link']['href']);
+      // dpm($vars['element']['#link']['href']);
       $vars['element']['#link']['localized_options']['query']['content_lock_token'] = backdrop_get_token($vars['element']['#link']['href']);
     }
   }
@@ -225,7 +225,7 @@ function content_lock_preprocess_menu_local_task(&$vars) {
  * @return void
  */
 function content_lock_preprocess_views_view_field(&$var) {
-  dpm($var['field']->field, 'field');
+  // dpm($var['field']->field, 'field');
   // dpm($var['output'], 'output');
   // echo print_r($var, true);
   // dpm($var['field']->views_handler_field_dropbutton, 'field');
@@ -235,7 +235,7 @@ function content_lock_preprocess_views_view_field(&$var) {
     $var['field']->field == 'contextual_links') {
 
     $output = $var['output'];
-    dpm($output, 'output');
+    // dpm($output, 'output');
 
     //extract the path to create the token
     $pattern = '/href="\/(node\/\d+\/edit)/';
@@ -247,7 +247,7 @@ function content_lock_preprocess_views_view_field(&$var) {
     $pattern = '/(href="\/node\/\d+\/edit[^"]*)/';
     $replacement = '$1&content_lock_token=' . backdrop_get_token($token_path);
     $var['output'] = preg_replace($pattern, $replacement, $output);
-    dpm($var['output']);
+    // dpm($var['output']);
   }
 }
 
