@@ -1,0 +1,5 @@
+{
+    "_config_name": "content_lock_timeout.settings",
+    "content_lock_timeout_minutes": "30",
+    "content_lock_timeout_on_edit": true
+}

@@ -1,0 +1,10 @@
+{
+    "_config_name": "content_lock.settings",
+    "content_lock_unload_js": true,
+    "content_lock_unload_js_message_enable": true,
+    "content_lock_unload_js_message": "If you proceed, ALL of your changes will be lost.",
+    "content_lock_admin_verbose": true,
+    "content_lock_admin_cancelbutton": true,
+    "content_lock_allowed_node_types": [],
+    "content_lock_allowed_formats": []
+}

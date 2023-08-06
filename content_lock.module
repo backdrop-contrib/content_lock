@@ -28,7 +28,7 @@ function content_lock_permission() {
 function content_lock_help($path, $arg) {
   switch ($path) {
     case 'admin/help#content_lock':
-      $output = '<p>' . t("Drupal's default content locking strategy is optimistic, that is, two users may start to edit the same content and the one who is hitting the save button first wins the race, while the other is displayed a message stating <em>this content has been modified by another user, changes cannot be saved</em>.  Depending on the number of editors in your organization this might not be an acceptable solution.") . '</p>';
+      $output = '<p>' . t("Backdrop's default content locking strategy is optimistic, that is, two users may start to edit the same content and the one who is hitting the save button first wins the race, while the other is displayed a message stating <em>this content has been modified by another user, changes cannot be saved</em>.  Depending on the number of editors in your organization this might not be an acceptable solution.") . '</p>';
       $output .= '<p>' . t('The Content locking module implements pessimistic locking, which means that content will be exclusively locked whenever a user starts editing it.  The lock will be automatically released when the user submits the form or navigates away from the edit page.') . '</p>';
       $output .= '<p>' . t('Users may also permanently lock content, to prevent others from editing it.  Content locks that have been "forgotten" can be automatically released after a configurable time span.') . '</p>';
 
@@ -91,7 +91,7 @@ function content_lock_menu() {
     'type' => MENU_NORMAL_ITEM,
     'title' => 'Content lock',
     'description' => 'Configuration options for the Content lock module',
-    'page callback' => 'drupal_get_form',
+    'page callback' => 'backdrop_get_form',
     'page arguments' => array('content_lock_admin_settings'),
     'access arguments' => array('administer site configuration'),
     'file' => 'content_lock.admin.inc',
@@ -114,21 +114,21 @@ function content_lock_admin_paths() {
 }
 
 /**
- * Implements hook_drupal_goto_alter().
+ * Implements hook_backdrop_goto_alter().
  */
-function content_lock_drupal_goto_alter(&$path, &$options, &$http_response_code) {
+function content_lock_backdrop_goto_alter(&$path, &$options, &$http_response_code) {
   // Add content lock token.
   if (module_exists('entity_translation') && fnmatch('node/*/edit/add/*/*', $path) && !isset($options['content_lock_token'])) {
     $options = array(
       'query' => array(
-        'content_lock_token' => drupal_get_token($path),
+        'content_lock_token' => backdrop_get_token($path),
       ),
     );
   }
 }
 
 /**
- * Check if an internal Drupal path should be protected with a token.
+ * Check if an internal Backdrop path should be protected with a token.
  *
  * Adds requirements that certain path be accessed only through tokenized URIs
  * which are enforced by this module. This prevents people from being CSRFed
@@ -138,7 +138,7 @@ function content_lock_drupal_goto_alter(&$path, &$options, &$http_response_code)
  *   Returns TRUE if the path is protected or FALSE if not protected.
  */
 function content_lock_is_path_protected($path) {
-  $cache = &drupal_static(__FUNCTION__, array());
+  $cache = &backdrop_static(__FUNCTION__, array());
 
   // Check cache.
   if (isset($cache[$path])) {
@@ -157,7 +157,7 @@ function content_lock_is_path_protected($path) {
   }
 
   // Allow other modules to alter the returned grants/denies.
-  drupal_alter('content_lock_path_protected', $protected, $path);
+  backdrop_alter('content_lock_path_protected', $protected, $path);
 
   // If TRUE is returned, path is protected.
   $cache[$path] = in_array(TRUE, $protected);
@@ -177,29 +177,82 @@ function content_lock_content_lock_path_protected($path) {
       'node/*/revisions/*/revert',
     );
     foreach ($paths_patterns as $protected_pattern) {
-      if (drupal_match_path($path, $protected_pattern)) {
+      if (backdrop_match_path($path, $protected_pattern)) {
         return TRUE;
       }
     }
   }
 
   // Allow extended tests via protection_menu_token module.
-  if (function_exists('protection_menu_token_is_path_protected')) {
-    return protection_menu_token_is_path_protected($path);
-  }
+  // if (function_exists('protection_menu_token_is_path_protected')) {
+  //   return protection_menu_token_is_path_protected($path);
+  // }
 }
 
 /**
  * Implements hook_preprocess_link().
  */
-function content_lock_preprocess_link(&$vars) {
+// function content_lock_preprocess_link(&$vars) {
+//   dpm($vars, 'vars');
+//   //Append a CSRF token to all paths that show the node add/edit form.
+//   if (content_lock_is_path_protected($vars['path'])) {
+//     if (!isset($vars['options']['query']['content_lock_token'])) {
+//       $vars['options']['query']['content_lock_token'] = backdrop_get_token($vars['path']);
+//     }
+//   }
+// }
+
+/**
+ * apply token to menu local task
+ *
+ * @param [type] $vars
+ * @return void
+ */
+function content_lock_preprocess_menu_local_task(&$vars) {
   // Append a CSRF token to all paths that show the node add/edit form.
-  if (content_lock_is_path_protected($vars['path'])) {
-    if (!isset($vars['options']['query']['content_lock_token'])) {
-      $vars['options']['query']['content_lock_token'] = drupal_get_token($vars['path']);
+  if (content_lock_is_path_protected($vars['element']['#link']['path'])) {
+    if (!isset($vars['element']['#link']['localized_options']['query']['content_lock_token'])) {
+      dpm($vars['element']['#link']['href']);
+      $vars['element']['#link']['localized_options']['query']['content_lock_token'] = backdrop_get_token($vars['element']['#link']['href']);
     }
   }
 }
+
+/**
+ * apply token on edit links for views
+ *
+ * @param [type] $var
+ * @return void
+ */
+function content_lock_preprocess_views_view_field(&$var) {
+  dpm($var['field']->field, 'field');
+  // dpm($var['output'], 'output');
+  // echo print_r($var, true);
+  // dpm($var['field']->views_handler_field_dropbutton, 'field');
+  // exit;
+  if ($var['field']->field == 'edit_node' ||
+    $var['field']->field == 'dropbutton' ||
+    $var['field']->field == 'contextual_links') {
+
+    $output = $var['output'];
+    dpm($output, 'output');
+
+    //extract the path to create the token
+    $pattern = '/href="\/(node\/\d+\/edit)/';
+    preg_match($pattern, $output, $matches);
+    $token_path = $matches[1];
+    // dpm($token_path, 'token_path');
+
+    // add token to href
+    $pattern = '/(href="\/node\/\d+\/edit[^"]*)/';
+    $replacement = '$1&content_lock_token=' . backdrop_get_token($token_path);
+    $var['output'] = preg_replace($pattern, $replacement, $output);
+    dpm($var['output']);
+  }
+}
+
+//TODO: add token to operacions on admin pages
+
 
 /**
  * Implements hook_node_validate().
@@ -214,12 +267,13 @@ function content_lock_node_validate($node, $form, &$form_state) {
         // Lock is no longer ours.
         form_set_error('changed', t('Your lock has been removed!') . '<br />' . content_lock_lock_owner($lock) . '<br />' . t('You can still save the content if this user aborts the edit operation without saving changes.'));
       }
-    }
-    else {
+    } else {
       // Node is not locked. Try to re-lock if node is unchanged.
       if (node_last_changed($node->nid) > $node->changed || !content_lock_node($node->nid, $user->uid)) {
-        form_set_error('alsochanged', t('Your lock has been removed due to inactivity or by an administrator. Failed to regain the lock since the document has been changed since. Please !discard.',
-          array('!discard' => l(t('discard your changes'), 'node/' . $node->nid))));
+        form_set_error('alsochanged', t(
+          'Your lock has been removed due to inactivity or by an administrator. Failed to regain the lock since the document has been changed since. Please !discard.',
+          array('!discard' => l(t('discard your changes'), 'node/' . $node->nid))
+        ));
       }
     }
   }
@@ -249,7 +303,8 @@ function content_lock_node_view($node, $view_mode, $langcode) {
   global $user;
   static $messages_shown = FALSE;
 
-  if ($view_mode != 'full'
+  if (
+    $view_mode != 'full'
     || !_content_lock_is_lockable_node($node)
   ) {
     return;
@@ -267,9 +322,21 @@ function content_lock_node_view($node, $view_mode, $langcode) {
 }
 
 /**
+ * Implements hook_config_info().
+ */
+function content_lock_config_info() {
+  $prefixes['content_lock.settings'] = array(
+    'label' => t('Content locking (edit lock) settings'),
+    'group' => t('Configuration'),
+  );
+  return $prefixes;
+}
+
+/**
  * Implements hook_form_alter().
  */
 function content_lock_form_alter(&$form, &$form_state, $form_id) {
+  $config = config('content_lock.settings');
   global $user;
   $node = empty($form['#node']) ? NULL : $form['#node'];
   $nid = empty($form['nid']['#value']) ? NULL : $form['nid']['#value'];
@@ -288,13 +355,14 @@ function content_lock_form_alter(&$form, &$form_state, $form_id) {
   // initialize it here.
   // Only touch node edit forms and then only if the form is `normal'
   // and has a body with a format (#1183678).
-  if (is_object($node) && is_numeric($nid)
+  if (
+    is_object($node) && is_numeric($nid)
     && ($form_id == $node->type . '_node_form' || $form_id == 'node_revision_revert_confirm')
     && isset($node->body)
     && is_array($node->body)
-    && !empty($node->body[$node->language][0]['format'])
+    && !empty($node->body[$node->langcode][0]['format'])
   ) {
-    $old_format = $node->body[$node->language][0]['format'];
+    $old_format = $node->body[$node->langcode][0]['format'];
     if (!empty($node->content_lock_old_format)) {
       $old_format = $node->content_lock_old_format;
     }
@@ -329,7 +397,7 @@ function content_lock_form_alter(&$form, &$form_state, $form_id) {
 
   if ($skip_lock == FALSE) {
     // Adding cancel button, if configured.
-    if (variable_get('content_lock_admin_cancelbutton', TRUE)) {
+    if ($config->get('content_lock_admin_cancelbutton')) {
       _content_lock_add_cancelbutton($form, $form_state, $form_id);
     }
     // If we are handling a preview, skip locking.
@@ -353,24 +421,23 @@ function content_lock_form_alter(&$form, &$form_state, $form_id) {
         //   the node automatically, but still give the user the possibility to
         //   lock the node manually using an AJAX call with a proper CSRF token.
         $menu_item = menu_get_item();
-        if (empty($_GET['content_lock_token']) || !drupal_valid_token($_GET['content_lock_token'], $menu_item['href'])) {
-          drupal_set_message(t('The page you are editing could not be locked automatically. Please !link to make sure other people cannot accidentally overwrite your changes.', array(
-            '!link' => l(t('lock the page'), 'nojs/content_lock/' . $nid . '/lock/' . drupal_get_token($nid), array('attributes' => array('class' => array('use-ajax')))),
+        if (empty($_GET['content_lock_token']) || !backdrop_valid_token($_GET['content_lock_token'], $menu_item['href'])) {
+          backdrop_set_message(t('The page you are editing could not be locked automatically. Please !link to make sure other people cannot accidentally overwrite your changes.', array(
+            '!link' => l(t('lock the page'), 'nojs/content_lock/' . $nid . '/lock/' . backdrop_get_token($nid), array('attributes' => array('class' => array('use-ajax')))),
           )), 'error');
           if (!content_lock_is_path_protected($menu_item['path'])) {
             watchdog('content_lock', 'Attempt to load the node_form form at menu path %path which is not protected from CSRF. Developers who want to create custom node editing pages and protect them with hook_content_lock_path_protected() or use protection_menu_token module to protect this path.', array('%path' => $menu_item['path']), WATCHDOG_WARNING);
           }
-        }
-        else {
+        } else {
           // Finally set the lock if everything passed.
           if (content_lock_node($nid, $user->uid) == FALSE) {
             // Could not lock node, it's locked by someone else.
-            drupal_goto($destination);
+            backdrop_goto($destination);
           }
           // If we should lock or already have been locked, load the unload js.
           // Don't use form alter but rather after build, so it works even for
           // previews.
-          elseif (variable_get('content_lock_unload_js', TRUE)) {
+          elseif ($config->get('content_lock_unload_js')) {
             $form['#after_build'][] = '_content_lock_add_unload_js';
           }
         }
@@ -411,8 +478,9 @@ function content_lock_content_lock_skip_locking($node, $form_id, $form, $form_st
     $form_id_blacklist['node_type_form'] = TRUE;
   }
   // Let other modules modify our blacklist.
-  drupal_alter('content_lock_form_id_blacklist', $form_id_blacklist, $node);
-  if ($node == NULL
+  backdrop_alter('content_lock_form_id_blacklist', $form_id_blacklist, $node);
+  if (
+    $node == NULL
     || empty($nid)
     || !empty($node_type_blacklist[$node->type])
     || !empty($form_id_blacklist[$form_id])
@@ -444,7 +512,7 @@ function content_lock_content_lock_skip_locking($node, $form_id, $form, $form_st
  * @see https://security.drupal.org/node/2429
  */
 function content_lock_get_release_token($nid) {
-  return drupal_get_token("content_lock/release/$nid");
+  return backdrop_get_token("content_lock/release/$nid");
 }
 
 /**
@@ -459,10 +527,11 @@ function content_lock_get_release_token($nid) {
  *   Form array
  */
 function _content_lock_add_unload_js(&$form, $form_state) {
-  $m = drupal_get_path('module', 'content_lock');
-  drupal_add_js("$m/js/jquery.url.packed.js", array('group' => JS_LIBRARY));
-  drupal_add_js("$m/js/onUserExit.js", array('group' => JS_LIBRARY));
-  drupal_add_js("$m/js/content_lock_init.js");
+  $config = config('content_lock.settings');
+  $m = backdrop_get_path('module', 'content_lock');
+  backdrop_add_js("$m/js/jquery.url.packed.js", array('group' => JS_LIBRARY));
+  backdrop_add_js("$m/js/onUserExit.js", array('group' => JS_LIBRARY));
+  backdrop_add_js("$m/js/content_lock_init.js");
 
   $nid = empty($form['nid']['#value']) ? NULL : $form['nid']['#value'];
   $internal_urls = array();
@@ -484,8 +553,7 @@ function _content_lock_add_unload_js(&$form, $form_state) {
   $lock = content_lock_fetch_lock($nid);
   if ($lock) {
     $lock_ajax_key = $lock->ajax_key;
-  }
-  else {
+  } else {
     $lock_ajax_key = FALSE;
   }
 
@@ -497,22 +565,22 @@ function _content_lock_add_unload_js(&$form, $form_state) {
     'nid' => $nid,
     'ajax_key' => $lock_ajax_key,
     'token' => $token,
-    'unload_js_message_enable' => variable_get('content_lock_unload_js_message_enable', TRUE),
+    'unload_js_message_enable' => $config->get('content_lock_unload_js_message_enable'),
     'internal_urls' => implode('|', $internal_urls),
     'internal_forms' => implode(', ', $internal_form_selectors),
   );
   if ($settings['unload_js_message_enable']) {
-    $settings['unload_js_message'] = variable_get('content_lock_unload_js_message', 'If you proceed, ALL of your changes will be lost.');
+    $settings['unload_js_message'] = $config->get('content_lock_unload_js_message');
   }
   /*
    * Workaround for http://drupal.org/node/1525784 where this function
    * is called multiple times when doing a file field AJAX upload and
    * array_merge_recursive() is used instead of
-   * drupal_array_merge_deep_array() to construct the Drupal.settings
-   * value. Not calling drupal_add_js() multiple times deprives
+   * backdrop_array_merge_deep_array() to construct the Backdrop.settings
+   * value. Not calling backdrop_add_js() multiple times deprives
    * file_ajax_upload() of the ability to mess up here ;-).
    */
-  $called =& drupal_static(__FUNCTION__ . '__called');
+  $called = &backdrop_static(__FUNCTION__ . '__called');
   if (!empty($called)) {
     $called++;
 
@@ -520,7 +588,7 @@ function _content_lock_add_unload_js(&$form, $form_state) {
   }
   $called = 1;
 
-  drupal_add_js(array('content_lock' => $settings), 'setting');
+  backdrop_add_js(array('content_lock' => $settings), 'setting');
 
   return $form;
 }
@@ -529,7 +597,7 @@ function _content_lock_add_unload_js(&$form, $form_state) {
  * Get verbose.
  */
 function _content_lock_verbose() {
-  return variable_get('content_lock_admin_verbose', TRUE);
+  return config_get('content_lock.settings', 'content_lock_admin_verbose');
 }
 
 /**
@@ -544,7 +612,8 @@ function _content_lock_add_cancelbutton(&$form, $form_state, $form_id) {
     $nid = $node->nid;
   }
 
-  if (!empty($node) && !empty($nid)
+  if (
+    !empty($node) && !empty($nid)
     && ($form_id == $node->type . '_node_form' || $form_id == 'node_revision_revert_confirm')
   ) {
     // Revert node.
@@ -647,16 +716,15 @@ function content_lock_node_ajax_callback($node, $token) {
   global $user;
 
   // Only lock the node if we have a valid CSRF token.
-  if (drupal_valid_token($token, $node->nid)) {
+  if (backdrop_valid_token($token, $node->nid)) {
     content_lock_node($node->nid, $user->uid);
 
     // Add the javascript that unlocks the node when the user navigates away
     // from the page.
     $form = array('nid' => array('#value' => $node->nid));
     _content_lock_add_unload_js($form, array());
-  }
-  else {
-    drupal_set_message(t('The content could not be locked.'));
+  } else {
+    backdrop_set_message(t('The content could not be locked.'));
   }
   $commands = array();
   $commands[] = ajax_command_remove('div.messages');
@@ -682,7 +750,6 @@ function content_lock_node_ajax_callback($node, $token) {
  */
 function content_lock_node($nid, $uid, $quiet = FALSE) {
   $lock = content_lock_fetch_lock($nid);
-
   if ($lock != FALSE && $lock->uid != $uid) {
     $message = content_lock_lock_owner($lock);
     if (user_access('administer checked out documents')) {
@@ -702,12 +769,11 @@ function content_lock_node($nid, $uid, $quiet = FALSE) {
       ));
     }
     if (!empty($message)) {
-      drupal_set_message($message, 'warning', FALSE);
+      backdrop_set_message($message, 'warning', FALSE);
     }
 
     return FALSE;
-  }
-  else {
+  } else {
     // No lock yet, create one.
     if ($lock == FALSE) {
       // Lock node.
@@ -717,26 +783,25 @@ function content_lock_node($nid, $uid, $quiet = FALSE) {
         'timestamp' => time(),
         'ajax_key' => rand(),
       );
-      drupal_write_record(
+      backdrop_write_record(
         'content_lock',
         $data
       );
 
       if (_content_lock_verbose() && !$quiet) {
-        drupal_set_message(t('This document is now locked against simultaneous editing.'), 'status', FALSE);
+        backdrop_set_message(t('This document is now locked against simultaneous editing.'), 'status', FALSE);
       }
       module_invoke_all('content_lock_locked', $nid, $uid);
-    }
-    else {
+    } else {
       /* A lock already exists: update its AJAX key */
       $lock->ajax_key = rand();
-      if (!drupal_write_record('content_lock', $lock, array('nid'))) {
+      if (!backdrop_write_record('content_lock', $lock, array('nid'))) {
         /*
          * we encountered a race condition where the lock was deleted
          * between when we loaded it and when we tried to update it
          * with a new key. Recreate the lock then:
          */
-        drupal_write_record('content_lock', $lock);
+        backdrop_write_record('content_lock', $lock);
       }
     }
   }
@@ -794,14 +859,20 @@ function content_lock_overview($account = NULL) {
   );
   // In the case of an admin, we do not have uid, as he sees all locks.
   if (!is_object($account)) {
-    $header[] = array('data' => t('Username'), 'field' => 'u.name');
+    $header[] = array(
+      'data' => t('Username'),
+      'field' => 'u.name',
+    );
     $uid = NULL;
   }
   // Otherwise we have the account of the user just being views as argument.
   else {
     $uid = $account->uid;
   }
-  $header[] = array('data' => t('Locked since'), 'field' => 'c.timestamp');
+  $header[] = array(
+    'data' => t('Locked since'),
+    'field' => 'c.timestamp',
+  );
   if ($uid == $user->uid || user_access('administer checked out documents')) {
     $header[] = t('Operations');
   }
@@ -862,7 +933,7 @@ function content_lock_overview($account = NULL) {
  */
 function content_lock_release_item($nid, $account = NULL) {
   global $user;
-  if (empty($_GET['token']) || !drupal_valid_token($_GET['token'], "content_lock/release/$nid")) {
+  if (empty($_GET['token']) || !backdrop_valid_token($_GET['token'], "content_lock/release/$nid")) {
     return MENU_ACCESS_DENIED;
   }
   if (!$account && _content_lock_verbose()) {
@@ -876,13 +947,12 @@ function content_lock_release_item($nid, $account = NULL) {
   if (_content_lock_verbose()) {
     if (!empty($lock) && !$account && $user->uid != $lock->uid) {
       $lock_account = user_load($lock->uid);
-      drupal_set_message(t('The editing lock held by !user has been released.', array('!user' => theme('username', array('account' => $lock_account)))), 'status', FALSE);
-    }
-    else {
-      drupal_set_message(t('The editing lock has been released.'), 'status', FALSE);
+      backdrop_set_message(t('The editing lock held by !user has been released.', array('!user' => theme('username', array('account' => $lock_account)))), 'status', FALSE);
+    } else {
+      backdrop_set_message(t('The editing lock has been released.'), 'status', FALSE);
     }
   }
-  drupal_goto($account ? "user/{$account->uid}/content_lock" : 'admin/content/content_lock');
+  backdrop_goto($account ? "user/{$account->uid}/content_lock" : 'admin/content/content_lock');
 }
 
 /**
@@ -904,8 +974,7 @@ function content_lock_warn_pending_locks($uid) {
 
   if (array_key_exists($uid, $warned_nodes)) {
     // Placeholder.
-  }
-  else {
+  } else {
     // Load form db.
     $warned_nodes[$uid] = array();
     $query = db_select('content_lock', 'c')
@@ -970,7 +1039,7 @@ function _content_lock_show_warnings() {
   }
   foreach ($data as $nid => $messsage) {
     if (_content_lock_still_locked($user->uid, $nid)) {
-      drupal_set_message($messsage, 'warning', FALSE);
+      backdrop_set_message($messsage, 'warning', FALSE);
     }
   }
   $_SESSION['content_lock'] = '';
@@ -1017,7 +1086,7 @@ function _content_lock_still_locked($uid, $nid) {
  * @param bool $ignore_token
  *   Use this to disable the anti-CSRF token check. This should only
  *   be disabled when some other means is being used to prevent
- *   CSRF. Drupal forms, for example, are already protected by the
+ *   CSRF. Backdrop forms, for example, are already protected by the
  *   equivalent of a token—we need not and may not go adding tokens to
  *   the node forms we hijack.
  *
@@ -1027,7 +1096,7 @@ function _content_lock_still_locked($uid, $nid) {
 function content_lock_release_own_item($nid, $response = TRUE, $ignore_token = FALSE) {
   global $user;
   if (!$ignore_token) {
-    if (!isset($_GET['token']) || !drupal_valid_token($_GET['token'], "content_lock/release/$nid")) {
+    if (!isset($_GET['token']) || !backdrop_valid_token($_GET['token'], "content_lock/release/$nid")) {
       return MENU_ACCESS_DENIED;
     }
   }
@@ -1040,25 +1109,22 @@ function content_lock_release_own_item($nid, $response = TRUE, $ignore_token = F
       $lock = content_lock_fetch_lock($nid);
       if (empty($lock) || strcmp($_GET['k'], $lock->ajax_key)) {
         // We have no lock or the key doesn't match. Don't unlock the node.
-        drupal_exit();;
+        backdrop_exit();
       }
     }
     content_lock_release($nid, $user->uid);
-    // Set drupal_get_messages().
+    // Set backdrop_get_messages().
     if ($response) {
-      drupal_goto("node/$nid");
+      backdrop_goto("node/$nid");
+    } else {
+      backdrop_exit();
     }
-    else {
-      drupal_exit();;
-    }
-  }
-  else {
+  } else {
     // If a user was creating a node and canceled.
     if ($response) {
-      drupal_goto();
-    }
-    else {
-      drupal_exit();;
+      backdrop_goto();
+    } else {
+      backdrop_exit();
     }
   }
 }
@@ -1074,14 +1140,15 @@ function _content_lock_is_lockable_node($node) {
  * Our own hook_content_lock_node_lockable().
  */
 function content_lock_content_lock_node_lockable($node) {
+  $config = config('content_lock.settings');
   static $lockable = array();
 
   // To catch the case where the user is changing the input format,
   // we store the original input format. Remember that not all nodes
   // store formats in the same way nor even have formats (#1183678).
   $format = '';
-  if (isset($node->body) && is_array($node->body) && !empty($node->body[$node->language][0]['format'])) {
-    $format = $node->body[$node->language][0]['format'];
+  if (isset($node->body) && is_array($node->body) && !empty($node->body[$node->langcode][0]['format'])) {
+    $format = $node->body[$node->langcode][0]['format'];
   }
   if (!empty($node->content_lock_old_format)) {
     $format = $node->content_lock_old_format;
@@ -1091,10 +1158,10 @@ function content_lock_content_lock_node_lockable($node) {
     return $lockable[$format][$node->nid];
   }
 
-  $types = array_filter(variable_get('content_lock_allowed_node_types', array()));
+  $types = array_filter($config->get('content_lock_allowed_node_types'));
   // Let other modules modify our blacklist.
-  drupal_alter('content_lock_node_type_blacklist', $types, $node);
-  $formats = array_filter(variable_get('content_lock_allowed_formats', array()));
+  backdrop_alter('content_lock_node_type_blacklist', $types, $node);
+  $formats = array_filter($config->get('content_lock_allowed_formats'));
   $lockable[$format][$node->nid] = FALSE;
   // Determine if the node is of a lockable content type or text format.
   if ((empty($types) || in_array($node->type, $types))
@@ -1112,7 +1179,7 @@ function content_lock_content_lock_node_lockable($node) {
 function content_lock_views_api() {
   return array(
     'api' => 2.0,
-    'path' => drupal_get_path('module', 'content_lock') . '/views',
+    'path' => backdrop_get_path('module', 'content_lock') . '/views',
   );
 }
 
@@ -1123,4 +1190,15 @@ function content_lock_ctools_plugin_directory($owner, $plugin_type) {
   if ($owner == 'ctools' && $plugin_type == 'access') {
     return "plugins/$plugin_type";
   }
+}
+
+/**
+ * Implements hook_autoload_info().
+ */
+function content_lock_autoload_info() {
+  return array(
+    'ContentLockViewsHandlerFieldLocked' => 'views/ContentLockViewsHandlerFieldLocked.inc',
+    'ContentLockViewsHandlerFilterLocked' => 'views/ContentLockViewsHandlerFilterLocked.inc',
+    'ContentLockViewsHandlerSortLocked' => 'views/ContentLockViewsHandlerSortLocked.inc',
+  );
 }

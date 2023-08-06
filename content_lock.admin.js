@@ -5,7 +5,7 @@
 
 (function ($) {
   'use strict';
-  Drupal.behaviors.content_lock_admin = {
+  Backdrop.behaviors.content_lock_admin = {
     attach: function (context) {
       var js_obj = jQuery('input[name="content_lock_unload_js"]', context);
       var js_message_obj = jQuery('input[name="content_lock_unload_js_message"]', context);

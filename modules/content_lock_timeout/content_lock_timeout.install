@@ -9,6 +9,26 @@
  * Implements hook_uninstall().
  */
 function content_lock_timeout_uninstall() {
-  variable_del('content_lock_timeout_minutes');
-  variable_del('content_lock_timeout_on_edit');
+  config_clear('content_lock_timeout.settings', 'content_lock_timeout_minutes');
+  config_clear('content_lock_timeout.settings', 'content_lock_timeout_on_edit');
+}
+
+/**
+ * Migrate content_lock_timeout variables to config.
+ */
+function content_lock_timeout_update_1000() {
+  $config = config('content_lock_timeout.settings');
+  $config->set('content_lock_timeout_minutes', update_variable_get('content_lock_timeout_minutes', '30'));
+  $config->set('content_lock_timeout_on_edit', update_variable_get('content_lock_timeout_on_edit', TRUE));
+  $config->save();
+
+  update_variable_del('content_lock_timeout_minutes');
+  update_variable_del('content_lock_timeout_on_edit');
+}
+
+/**
+ * Implements hook_install().
+ */
+function content_lock_timeout_install() {
+  // Dynamically generated variable data was detected.
 }
