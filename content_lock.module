@@ -193,13 +193,13 @@ function content_lock_content_lock_path_protected($path) {
  * Implements hook_preprocess_link().
  */
 // function content_lock_preprocess_link(&$vars) {
-//   dpm($vars, 'vars');
-//   //Append a CSRF token to all paths that show the node add/edit form.
-//   if (content_lock_is_path_protected($vars['path'])) {
-//     if (!isset($vars['options']['query']['content_lock_token'])) {
-//       $vars['options']['query']['content_lock_token'] = backdrop_get_token($vars['path']);
-//     }
-//   }
+  // dpm($vars, 'vars');
+  // Append a CSRF token to all paths that show the node add/edit form.
+  // if (content_lock_is_path_protected($vars['path'])) {
+  //   if (!isset($vars['options']['query']['content_lock_token'])) {
+  //     $vars['options']['query']['content_lock_token'] = backdrop_get_token($vars['path']);
+  //   }
+  // }
 // }
 
 /**
@@ -210,7 +210,7 @@ function content_lock_content_lock_path_protected($path) {
  */
 function content_lock_preprocess_menu_local_task(&$vars) {
   // Append a CSRF token to all paths that show the node add/edit form.
-  if (content_lock_is_path_protected($vars['element']['#link']['path'])) {
+  if (isset($vars['element']['#link']['path']) && content_lock_is_path_protected($vars['element']['#link']['path'])) {
     if (!isset($vars['element']['#link']['localized_options']['query']['content_lock_token'])) {
       // dpm($vars['element']['#link']['href']);
       $vars['element']['#link']['localized_options']['query']['content_lock_token'] = backdrop_get_token($vars['element']['#link']['href']);
@@ -225,34 +225,23 @@ function content_lock_preprocess_menu_local_task(&$vars) {
  * @return void
  */
 function content_lock_preprocess_views_view_field(&$var) {
-  // dpm($var['field']->field, 'field');
-  // dpm($var['output'], 'output');
-  // echo print_r($var, true);
-  // dpm($var['field']->views_handler_field_dropbutton, 'field');
-  // exit;
   if ($var['field']->field == 'edit_node' ||
     $var['field']->field == 'dropbutton' ||
     $var['field']->field == 'contextual_links') {
 
     $output = $var['output'];
-    // dpm($output, 'output');
 
     //extract the path to create the token
     $pattern = '/href="\/(node\/\d+\/edit)/';
     preg_match($pattern, $output, $matches);
     $token_path = $matches[1];
-    // dpm($token_path, 'token_path');
 
     // add token to href
     $pattern = '/(href="\/node\/\d+\/edit[^"]*)/';
     $replacement = '$1&content_lock_token=' . backdrop_get_token($token_path);
     $var['output'] = preg_replace($pattern, $replacement, $output);
-    // dpm($var['output']);
   }
 }
-
-//TODO: add token to operacions on admin pages
-
 
 /**
  * Implements hook_node_validate().
