@@ -1149,11 +1149,15 @@ function content_lock_content_lock_node_lockable($node) {
     return $lockable[$format][$node->nid];
   }
 
-  $types = array_filter($config->get('content_lock_allowed_node_types'));
-  // Let other modules modify our blacklist.
-  backdrop_alter('content_lock_node_type_blacklist', $types, $node);
-  $formats = array_filter($config->get('content_lock_allowed_formats'));
-  $lockable[$format][$node->nid] = FALSE;
+  $saved_types = $config->get('content_lock_allowed_node_types');
+  if (!empty($saved_types)) {
+    $types = array_filter($saved_types);
+    // Let other modules modify our blacklist.
+    backdrop_alter('content_lock_node_type_blacklist', $types, $node);
+    $formats = array_filter($config->get('content_lock_allowed_formats'));
+    $lockable[$format][$node->nid] = FALSE;
+  }
+
   // Determine if the node is of a lockable content type or text format.
   if ((empty($types) || in_array($node->type, $types))
     && (empty($formats) || in_array($format, $formats))
